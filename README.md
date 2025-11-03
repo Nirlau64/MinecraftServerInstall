@@ -26,7 +26,7 @@ This script automates the setup of a Minecraft server, including support for For
 ## Mod Loader Support
 
 * **Forge** – fully tested and working.
-* **Fabric** – works **only with the setup script in the `test` branch**.
+* **Fabric** – works **only with the setup script in the `testing` branch**.
 
 ## Notes
 
