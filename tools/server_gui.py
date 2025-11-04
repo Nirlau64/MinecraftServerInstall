@@ -37,6 +37,8 @@ from pathlib import Path
 import tempfile
 import shutil
 import re
+import socket
+import struct
 
 class MinecraftServerGUI:
     def __init__(self, root, server_dir=None):
@@ -346,6 +348,11 @@ The GUI will guide you through the entire process!"""
         
         self.players_label = ttk.Label(status_frame, text="Players: 0/20")
         self.players_label.pack(anchor='w')
+        
+        self.ping_label = ttk.Label(status_frame, text="")
+        self.ping_label.pack(anchor='w')
+        
+        self.server_info = {"online_players": 0, "max_players": 20, "motd": "Unknown"}
         
         # Control Buttons
         control_frame = ttk.Frame(server_frame)
@@ -904,6 +911,141 @@ The GUI will guide you through the entire process!"""
         
         return True
     
+    # Server Query Methods
+    def query_server_status(self, host="localhost", port=25565, timeout=5):
+        """Query Minecraft server status using the Server List Ping protocol"""
+        start_time = time.time()
+        try:
+            # Create socket connection
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            sock.connect((host, port))
+            
+            # Send handshake packet
+            handshake = self._pack_varint(47) + \
+                       self._pack_string(host) + \
+                       struct.pack('>H', port) + \
+                       self._pack_varint(1)
+            
+            self._send_packet(sock, 0x00, handshake)
+            
+            # Send status request
+            self._send_packet(sock, 0x00, b'')
+            
+            # Read response
+            response_length = self._unpack_varint(sock)
+            response_id = self._unpack_varint(sock)
+            response_data = self._unpack_string(sock)
+            
+            # Measure ping time
+            ping_time = round((time.time() - start_time) * 1000, 1)
+            
+            sock.close()
+            
+            # Parse JSON response
+            import json
+            server_status = json.loads(response_data)
+            
+            # Extract player information
+            players = server_status.get('players', {})
+            online_players = players.get('online', 0)
+            max_players = players.get('max', 20)
+            
+            # Get server description/MOTD
+            description = server_status.get('description', {})
+            if isinstance(description, dict):
+                motd = description.get('text', 'Minecraft Server')
+            else:
+                motd = str(description)
+            
+            # Get player list if available
+            player_list = []
+            if 'sample' in players:
+                player_list = [player.get('name', '') for player in players['sample']]
+            
+            return {
+                'online_players': online_players,
+                'max_players': max_players,
+                'motd': motd,
+                'online': True,
+                'ping': True,
+                'ping_time': ping_time,
+                'player_list': player_list
+            }
+            
+        except Exception as e:
+            # Server is not reachable or not responding
+            return {
+                'online_players': 0,
+                'max_players': int(self.max_players_var.get()),
+                'motd': 'Server Offline',
+                'online': False,
+                'ping': False,
+                'ping_time': None,
+                'error': str(e),
+                'player_list': []
+            }
+    
+    def _pack_varint(self, value):
+        """Pack integer as varint for Minecraft protocol"""
+        data = b''
+        while value >= 0x80:
+            data += struct.pack('B', value & 0x7F | 0x80)
+            value >>= 7
+        data += struct.pack('B', value)
+        return data
+    
+    def _pack_string(self, string):
+        """Pack string for Minecraft protocol"""
+        encoded = string.encode('utf-8')
+        return self._pack_varint(len(encoded)) + encoded
+    
+    def _send_packet(self, sock, packet_id, data):
+        """Send packet to Minecraft server"""
+        packet_data = self._pack_varint(packet_id) + data
+        packet_length = self._pack_varint(len(packet_data))
+        sock.send(packet_length + packet_data)
+    
+    def _unpack_varint(self, sock):
+        """Unpack varint from socket"""
+        result = 0
+        shift = 0
+        while True:
+            byte_data = sock.recv(1)
+            if len(byte_data) == 0:
+                raise ConnectionError("Unexpected end of stream")
+            
+            byte = struct.unpack('B', byte_data)[0]
+            result |= (byte & 0x7F) << shift
+            
+            if (byte & 0x80) == 0:
+                break
+                
+            shift += 7
+            if shift >= 32:
+                raise ValueError("VarInt too long")
+                
+        return result
+    
+    def _unpack_string(self, sock):
+        """Unpack string from socket"""
+        length = self._unpack_varint(sock)
+        return sock.recv(length).decode('utf-8')
+    
+    def get_server_port(self):
+        """Get server port from server.properties"""
+        try:
+            props_file = self.server_dir / "server.properties"
+            if props_file.exists():
+                with open(props_file, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith('server-port='):
+                            return int(line.split('=', 1)[1])
+            return 25565  # Default Minecraft port
+        except:
+            return 25565
+    
     # Server Control Methods
     def start_server(self):
         """Start the Minecraft server"""
@@ -1426,6 +1568,24 @@ The GUI will guide you through the entire process!"""
             if self.server_status == "running":
                 status_color = "green"
                 status_text = "Running"
+                
+                # Query server for real player count when running
+                def query_async():
+                    try:
+                        port = self.get_server_port()
+                        server_info = self.query_server_status("localhost", port, timeout=3)
+                        self.server_info.update(server_info)
+                        
+                        # Update UI in main thread
+                        self.root.after(0, self._update_player_display)
+                        
+                    except Exception as e:
+                        # If query fails, keep last known values
+                        pass
+                
+                # Run query in background to avoid blocking UI
+                threading.Thread(target=query_async, daemon=True).start()
+                
             else:
                 status_color = "orange"
                 status_text = "Starting"
@@ -1433,11 +1593,52 @@ The GUI will guide you through the entire process!"""
             status_color = "red"
             status_text = "Stopped"
             self.server_status = "stopped"
+            # Reset player count when server is stopped
+            self.server_info.update({
+                "online_players": 0,
+                "max_players": int(self.max_players_var.get()),
+                "online": False
+            })
         
         self.status_label.config(text=f"Status: {status_text}")
+        self._update_player_display()
+    
+    def _update_player_display(self):
+        """Update player count and server info display"""
+        online = self.server_info.get('online_players', 0)
+        max_players = self.server_info.get('max_players', int(self.max_players_var.get()))
         
-        # Update players (placeholder - would need server query for real data)
-        self.players_label.config(text=f"Players: 0/{self.max_players_var.get()}")
+        if self.server_info.get('online', False):
+            # Server is online and responding to queries
+            self.players_label.config(text=f"Players: {online}/{max_players}")
+            
+            # Show ping time and additional info
+            ping_time = self.server_info.get('ping_time')
+            if ping_time is not None:
+                ping_text = f"Ping: {ping_time}ms"
+                
+                # Add player list if available (limit to avoid UI clutter)
+                player_list = self.server_info.get('player_list', [])
+                if player_list:
+                    if len(player_list) <= 3:
+                        ping_text += f" | Online: {', '.join(player_list)}"
+                    else:
+                        ping_text += f" | Online: {', '.join(player_list[:3])} (+{len(player_list)-3} more)"
+                
+                self.ping_label.config(text=ping_text)
+            else:
+                self.ping_label.config(text="")
+                
+        else:
+            # Server is offline or not responding
+            if self.server_status == "running":
+                # Server process running but not responding to queries yet
+                self.players_label.config(text=f"Players: Starting... /{max_players}")
+                self.ping_label.config(text="Waiting for server to accept connections...")
+            else:
+                # Server stopped
+                self.players_label.config(text=f"Players: 0/{max_players}")
+                self.ping_label.config(text="")
     
     def monitor_server(self):
         """Monitor server status periodically"""
