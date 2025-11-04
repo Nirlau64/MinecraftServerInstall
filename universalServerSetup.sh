@@ -1053,6 +1053,17 @@ setup_java() {
 # Description: Checks for Python 3 and installs it if missing for mod downloads
 # Returns: 0 if Python 3 is available, exit 1 if installation failed
 install_python3_if_needed() {
+  # Check if we're being run from GUI (Python 3 is already available)
+  if [ "${GUI_LAUNCHED:-0}" = "1" ] || [ "${LAUNCHED_FROM_GUI:-0}" = "1" ]; then
+    if command -v python3 >/dev/null 2>&1; then
+      log_info "Python 3 detected (launched from GUI): $(python3 --version 2>&1)"
+      # Don't set PYTHON3_INSTALLED_BY_SCRIPT since GUI needs it
+      return 0
+    else
+      log_warn "GUI launched but Python 3 not found - this should not happen!"
+    fi
+  fi
+  
   # Check if Python 3 is already available
   if command -v python3 >/dev/null 2>&1; then
     log_info "Python 3 is already available: $(python3 --version 2>&1)"
@@ -1147,6 +1158,12 @@ install_python3_if_needed() {
 cleanup_python3_if_installed() {
   if [ "$PYTHON3_INSTALLED_BY_SCRIPT" != "1" ]; then
     return 0  # We didn't install it, so don't remove it
+  fi
+
+  # Don't remove Python 3 if GUI is running or if we're in GUI mode
+  if [ "${GUI_LAUNCHED:-0}" = "1" ] || [ -f ".gui_pid" ]; then
+    log_info "Keeping Python 3 installed (GUI is running or was used)"
+    return 0
   fi
 
   log_info "Cleaning up Python 3 that was installed by this script..."
@@ -1860,8 +1877,18 @@ fi
 if [ "$AUTO_DOWNLOAD_MODS" = 1 ] && [ -n "$HAS_MANIFEST" ]; then
   log_info "[4.5/7] Attempting automatic mod download..."
   
-  # Check if Python 3 is available or install it
-  if command -v python3 >/dev/null 2>&1 || install_python3_if_needed; then
+  # Check if Python 3 is available or install it (skip installation if from GUI)
+  python3_available=0
+  if [ "${GUI_LAUNCHED:-0}" = "1" ] || [ "${LAUNCHED_FROM_GUI:-0}" = "1" ]; then
+    if command -v python3 >/dev/null 2>&1; then
+      log_info "Using Python 3 from GUI environment: $(python3 --version 2>&1)"
+      python3_available=1
+    fi
+  elif command -v python3 >/dev/null 2>&1 || install_python3_if_needed; then
+    python3_available=1
+  fi
+  
+  if [ "$python3_available" = "1" ]; then
     # Check if our downloader script exists
     DOWNLOADER_SCRIPT="$(dirname "$0")/tools/cf_downloader.py"
     if [ -f "$DOWNLOADER_SCRIPT" ]; then
@@ -1918,8 +1945,12 @@ if [ "$AUTO_DOWNLOAD_MODS" = 1 ] && [ -n "$HAS_MANIFEST" ]; then
       log_warn "Automatic mod download is not available - falling back to manual installation"
     fi
     
-    # Cleanup Python 3 if we installed it
-    cleanup_python3_if_installed
+    # Cleanup Python 3 if we installed it (but not if launched from GUI)
+    if [ "${GUI_LAUNCHED:-0}" != "1" ] && [ "${LAUNCHED_FROM_GUI:-0}" != "1" ]; then
+      cleanup_python3_if_installed
+    else
+      log_info "Keeping Python 3 for GUI usage"
+    fi
   else
     log_err "Failed to install or find Python 3 for automatic mod download"
     log_warn "Falling back to manual mod installation"
@@ -2112,8 +2143,12 @@ chmod +x start.sh
 
 run rm -rf "$WORK" _fabric.json 2>/dev/null || true
 
-# Final cleanup of Python 3 if we installed it
-cleanup_python3_if_installed
+# Final cleanup of Python 3 if we installed it (but not if launched from GUI)
+if [ "${GUI_LAUNCHED:-0}" != "1" ] && [ "${LAUNCHED_FROM_GUI:-0}" != "1" ]; then
+  cleanup_python3_if_installed
+else
+  log_info "Keeping Python 3 for GUI usage (launched from GUI)"
+fi
 
 log_info "Install complete. Edit server.properties, then run: ./start.sh"
 

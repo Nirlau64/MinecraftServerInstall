@@ -754,13 +754,19 @@ The GUI will guide you through the entire process!"""
                 self.log_message("Starting server setup...")
                 self.log_message(f"Command: {' '.join(cmd)}")
                 
+                # Set environment variables to signal GUI mode
+                env = os.environ.copy()
+                env['GUI_LAUNCHED'] = '1'
+                env['LAUNCHED_FROM_GUI'] = '1'
+                
                 process = subprocess.Popen(
                     cmd,
                     cwd=str(self.server_dir),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     universal_newlines=True,
-                    bufsize=1
+                    bufsize=1,
+                    env=env
                 )
                 
                 # Read output line by line
