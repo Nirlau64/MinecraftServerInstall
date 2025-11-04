@@ -1,42 +1,80 @@
+
 #!/usr/bin/env bash
-# Universal Minecraft Server Setup
-# - Restructured for clarity and maintainability
-# - All user-tweakable settings are in the CONFIG section below
+# Universal Minecraft Server Setup Script
+# ---------------------------------------
+# This script automates the installation and configuration of a modded Minecraft server.
+# It supports Forge, NeoForge, Fabric, and Quilt loaders, and can handle both server packs and client exports.
+#
+# Usage:
+#   ./universalServerSetup - Working.sh [Modpack.zip]
+#
+# Features:
+#   - Automatic Java version detection and installation
+#   - Dynamic RAM allocation (default: 75% of system RAM)
+#   - EULA handling (interactive or unattended)
+#   - Operator assignment
+#   - Robust mod/config copy logic
+#   - Generates a universal start.sh script
+#
+# Requirements:
+#   - unzip, curl, jq, rsync
+#   - sudo rights for Java installation
+#   - Internet connection for downloads
+#
+# For more details, see README.md
 
 set -euo pipefail
 
-######################################
-# CONFIG: User-editable settings
-######################################
-# Zip file to install (CLI arg still supported). Will also be set from first non-option arg.
+# -----------------------------------------------------------------------------
+# CONFIGURATION SECTION (User-editable)
+# -----------------------------------------------------------------------------
+
+# Path to the modpack ZIP file to install. Can be set via CLI argument or environment variable ZIP_OVERRIDE.
 ZIP="${ZIP_OVERRIDE:-pack.zip}"
 
-# OP: Automatically grant operator to this player name (leave empty to skip)
+
+# Operator settings
+# OP_USERNAME: Minecraft username to grant operator rights (leave empty to skip)
+# OP_LEVEL: Operator permission level (1-4); 4 is admin
 OP_USERNAME="${OP_USERNAME:-}"
-# OP permission level (1-4); 4 is admin
 OP_LEVEL="${OP_LEVEL:-4}"
 
-# Always OP these usernames (space-separated). Defaults to repo owner reference.
+
+# Space-separated list of usernames to always OP (default: repo owner)
 ALWAYS_OP_USERS="${ALWAYS_OP_USERS:-lorol61}"
 
+
 # Non-interactive defaults (used when no TTY). Values: "yes" or "no"
+# AUTO_ACCEPT_EULA: Accept EULA automatically if no terminal
+# AUTO_FIRST_RUN: Run server automatically after setup if no terminal
 AUTO_ACCEPT_EULA="${AUTO_ACCEPT_EULA:-yes}"
 AUTO_FIRST_RUN="${AUTO_FIRST_RUN:-yes}"
 
+
 # Memory configuration for dynamic sizing (used when JAVA_ARGS is empty)
-MEMORY_PERCENT="${MEMORY_PERCENT:-75}"   # percent of system RAM to allocate
-MIN_MEMORY_MB="${MIN_MEMORY_MB:-2048}"   # clamp minimum
-MAX_MEMORY_MB="${MAX_MEMORY_MB:-32768}"  # clamp maximum
+# MEMORY_PERCENT: Percent of system RAM to allocate to JVM
+# MIN_MEMORY_MB: Minimum RAM in MB
+# MAX_MEMORY_MB: Maximum RAM in MB
+MEMORY_PERCENT="${MEMORY_PERCENT:-75}"
+MIN_MEMORY_MB="${MIN_MEMORY_MB:-2048}"
+MAX_MEMORY_MB="${MAX_MEMORY_MB:-32768}"
+
 
 # Optional: force custom JVM args like "-Xms8G -Xmx8G"
 JAVA_ARGS="${JAVA_ARGS:-}"
 
+
 # Installation directories
+# SRVDIR: Server directory (default: current directory)
+# WORK: Temporary working directory
 SRVDIR="${SRVDIR:-$(pwd)}"
 WORK="${WORK:-${SRVDIR}/_work}"
 
-######################################
+
+# -----------------------------------------------------------------------------
 # Runtime flags (populated via CLI/env)
+# -----------------------------------------------------------------------------
+# These are set by command-line arguments or environment variables
 ASSUME_YES=0
 ASSUME_NO=0
 NO_EULA_PROMPT=0
@@ -44,17 +82,19 @@ EULA_VALUE=""   # "true" or "false"
 FORCE=0
 DRY_RUN=0
 
-######################################
+# -----------------------------------------------------------------------------
 # Logging helpers
-######################################
+# -----------------------------------------------------------------------------
 log()       { printf '%s\n' "$*"; }
 log_info()  { printf '[INFO] %s\n' "$*"; }
 log_warn()  { printf '[WARN] %s\n' "$*" >&2; }
 log_err()   { printf '[ERROR] %s\n' "$*" >&2; }
 
-######################################
+# -----------------------------------------------------------------------------
 # Utility helpers
-######################################
+# -----------------------------------------------------------------------------
+
+# Returns 0 if argument is a truthy value (yes, true, 1, etc.), else 1
 truthy() {
   case "${1:-}" in
     1|yes|true|on|y|Y|TRUE|YES) return 0;;
@@ -62,6 +102,8 @@ truthy() {
   esac
 }
 
+
+# Runs a command, or logs it if DRY_RUN is enabled
 run() {
   if [ "$DRY_RUN" = "1" ]; then
     log_info "[DRY-RUN] $*"
@@ -70,8 +112,9 @@ run() {
   fi
 }
 
+
+# Writes content to a file, or logs if DRY_RUN is enabled
 write_file() {
-  # write_file <path> <content>
   local path="$1"; shift
   if [ "$DRY_RUN" = "1" ]; then
     log_info "[DRY-RUN] write to $path"
@@ -80,6 +123,8 @@ write_file() {
   fi
 }
 
+
+# Appends content to a file, or logs if DRY_RUN is enabled
 append_file() {
   local path="$1"; shift
   if [ "$DRY_RUN" = "1" ]; then
@@ -322,24 +367,24 @@ setup_java() {
 get_memory_args() {
   local mem_kb mem_mb mem_target
   
-  # Versuche verschiedene Methoden zur RAM-Erkennung
+  # Try various methods to detect RAM
   if [ -r /proc/meminfo ]; then
-    # Linux: Lese aus /proc/meminfo
+    # Linux: Read from /proc/meminfo
     mem_kb=$(grep '^MemTotal:' /proc/meminfo | awk '{print $2}')
     mem_mb=$((mem_kb / 1024))
   elif command -v sysctl >/dev/null 2>&1; then
-    # macOS und BSD: Verwende sysctl
+    # macOS and BSD: Use sysctl
     mem_mb=$(sysctl -n hw.memsize 2>/dev/null | awk '{print int($1/1024/1024)}' || echo 0)
   elif command -v wmic >/dev/null 2>&1; then
-    # Windows (WSL): Verwende wmic
+    # Windows (WSL): Use wmic
     mem_mb=$(wmic computersystem get totalphysicalmemory 2>/dev/null | grep -v Total | awk '{print int($1/1024/1024)}' || echo 0)
   else
-    # Fallback: Verwende konservative Standard-Werte
+    # Fallback: Use conservative default values
     echo "-Xms4G -Xmx8G"
     return 0
   fi
 
-  # Wenn Erkennung fehlschlug oder ungültiger Wert, verwende Standard
+  # If detection failed or invalid value, use default
   if [ -z "$mem_mb" ] || [ "$mem_mb" -lt 1024 ]; then
     echo "-Xms4G -Xmx8G"
     return 0
@@ -355,7 +400,7 @@ get_memory_args() {
     mem_target="$MAX_MEMORY_MB"
   fi
 
-  # Gib formatierte JVM-Argumente zurück
+  # Return formatted JVM arguments
   echo "-Xms${mem_target}M -Xmx${mem_target}M"
 }
 
@@ -370,8 +415,8 @@ get_memory_args() {
 detect_server_jar() {
   local j
   
-  # Priorität 1: Explizite Modloader-Server-JARs
-  # Forge (klassisch und neue Versionen)
+  # Priority 1: Explicit modloader server JARs
+  # Forge (classic and new versions)
   j=$(ls -1 forge-*-server*.jar forge-*.jar 2>/dev/null | grep -v installer | head -n1 || true)
   [ -n "$j" ] || j=$(ls -1 neoforge-*-server*.jar neoforge-*.jar 2>/dev/null | grep -v installer | head -n1 || true)
   [ -n "$j" ] || j=$(ls -1 fabric-server-launch.jar fabric-server*.jar 2>/dev/null | head -n1 || true)
@@ -380,11 +425,11 @@ detect_server_jar() {
   [ -n "$j" ] || j=$(ls -1 run*.jar 2>/dev/null | head -n1 || true)
   if [ -n "$j" ]; then printf '%s' "$j"; return 0; fi
 
-  # Priorität 2: Server-JARs (außer Vanilla minecraft_server)
+  # Priority 2: Server JARs (excluding vanilla minecraft_server)
   j=$(ls -1 *-server*.jar 2>/dev/null | grep -v "minecraft_server" | head -n1 || true)
   if [ -n "$j" ]; then printf '%s' "$j"; return 0; fi
 
-  # Fallback: Größte JAR-Datei (außer Installer)
+  # Fallback: Largest JAR file (excluding installer)
   j=$(ls -S *.jar 2>/dev/null | grep -v -i installer | head -n1 || true)
   printf '%s' "$j"
 }
@@ -478,7 +523,7 @@ HAS_START=$(grep -rilE 'startserver\.sh|start\.sh' "$WORK" || true)
 HAS_MANIFEST=$(find "$WORK" -maxdepth 3 -name manifest.json | head -n1 || true)
 
 ################################################################################
-# PFAD 1: Server-Pack Installation
+# PATH 1: Server-Pack Installation
 ################################################################################
 if [ -n "$HAS_START" ]; then
   log_info "[2/7] Server files detected."
@@ -487,7 +532,7 @@ if [ -n "$HAS_START" ]; then
   [ -z "$MC_VER" ] && MC_VER=$(find "$WORK" -name manifest.json -exec jq -r '.minecraft.version // empty' {} \; 2>/dev/null | head -n1 || true)
   [ -z "$MC_VER" ] && MC_VER=$(ls forge-*.jar 2>/dev/null | grep -o '1\.[0-9.]*' | head -n1 || true)
   
-  # Setup Java basierend auf erkannter MC-Version
+  # Setup Java based on detected MC version
   if [ -n "$MC_VER" ]; then
     setup_java "$MC_VER"
   else
@@ -641,7 +686,7 @@ EOFMARKER1
 fi
 
 ################################################################################
-# PFAD 2: Client-Export Konvertierung
+# PATH 2: Client Export Conversion
 ################################################################################
 if [ -z "$HAS_MANIFEST" ]; then
   echo "FEHLER: Weder Server-Dateien noch manifest.json gefunden." >&2
