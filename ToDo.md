@@ -171,7 +171,34 @@ Akzeptanzkriterien:
 - `dist/minecraft.service` (optional): systemd-Unit-Template.
 - `logs/install-*.log`, `logs/missing-mods.txt`: Protokolle.
 
+
+---
+
+## 9) Optionale GUI zur Serververwaltung
+
+Ziel: Eine kleine, optionale (standardmäßig aktivierte) grafische Oberfläche zur Verwaltung des Servers nach dem Start (Welten, Backups, Logs, Start/Stop, etc.).
+
+- [ ] GUI-Framework auswählen (z. B. Python/PyQt, Electron, GTK, Tkinter)
+- [ ] Integration als separater Prozess, der nach dem Setup automatisch startet (deaktivierbar per Flag/ENV)
+- [ ] Features:
+  - [ ] Weltverwaltung (Wechseln, Erstellen, Löschen)
+  - [ ] Backups (Erstellen, Wiederherstellen, Listen anzeigen)
+  - [ ] Server-Start/Stop/Restart
+  - [ ] Log-Viewer (install.log, missing-mods.txt, server.log)
+  - [ ] Mod-Übersicht (Anzeige, ggf. Download/Update)
+  - [ ] Anzeige von Serverstatus und Ressourcenverbrauch
+- [ ] Kommunikation mit Server über Shell-Kommandos, Dateien und ggf. tmux/systemd
+- [ ] Headless-Erkennung: GUI startet nur, wenn Display verfügbar ist
+- [ ] Konfigurierbarkeit: Standardmäßig aktiv, aber per Flag/ENV deaktivierbar (z. B. `--no-gui`, `GUI=0`)
+- [ ] Dokumentation und Beispiele für GUI-Nutzung ergänzen
+
+Akzeptanzkriterien:
+- Nach dem Setup ist die GUI verfügbar und kann die wichtigsten Verwaltungsaufgaben ausführen
+- GUI ist optional und kann für reine Server-/CI-Nutzung deaktiviert werden
+
+---
+
 ## Dokumentation
 
-- `README.md` ergänzen: neue Flags/ENV, Nutzung von systemd/tmux, Hinweise zum optionalen Mod-Download.
+- `README.md` ergänzen: neue Flags/ENV, Nutzung von systemd/tmux, Hinweise zum optionalen Mod-Download und zur GUI.
 - Beispiele aufführen (interaktiv vs. unattended) und typische Fehlerbilder + Lösungen.
