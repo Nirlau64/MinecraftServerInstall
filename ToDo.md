@@ -76,13 +76,14 @@ Akzeptanzkriterien:
 
 ## 4) systemd/tmux‑Integration (optional)
 
+
 Ziel: Betrieb als Dienst oder in einer abgekoppelten Session vereinfachen.
 
-- [ ] `--systemd` erzeugt `./dist/minecraft.service` (nur Schreiben ins Repo-Verzeichnis):
+- [x] `--systemd` erzeugt `./dist/minecraft.service` (nur Schreiben ins Repo-Verzeichnis):
   - Enthält User, Arbeitsverzeichnis, `JAVA_ARGS`/`RAM`, Aufruf von `./start.sh`.
   - Hinweis zur Installation: `sudo cp`, `systemctl enable --now`.
-- [ ] `--tmux` startet/erstellt Session `minecraft` und führt `./start.sh` darin aus.
-- [ ] Kollisionserkennung: vorhandene tmux-Session/Dienst wird erkannt und gemeldet.
+- [x] `--tmux` startet/erstellt Session `minecraft` und führt `./start.sh` darin aus.
+- [x] Kollisionserkennung: vorhandene tmux-Session/Dienst wird erkannt und gemeldet.
 
 Akzeptanzkriterien:
 - Mit `--systemd` entsteht eine funktionierende Unit-Datei; automatische Neustarts bei Crash sind konfiguriert.

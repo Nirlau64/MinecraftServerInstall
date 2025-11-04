@@ -81,6 +81,8 @@ NO_EULA_PROMPT=0
 EULA_VALUE=""   # "true" or "false"
 FORCE=0
 DRY_RUN=0
+SYSTEMD=0
+TMUX=0
 
 # -----------------------------------------------------------------------------
 # Logging helpers
@@ -205,6 +207,65 @@ append_file() {
 ######################################
 parse_args() {
   while [ $# -gt 0 ]; do
+    case "$1" in
+      --systemd)
+        SYSTEMD=1
+        ;;
+      --tmux)
+        TMUX=1
+        ;;
+      --yes)
+        ASSUME_YES=1
+        ;;
+      --assume-no)
+        ASSUME_NO=1
+        ;;
+      --no-eula-prompt)
+        NO_EULA_PROMPT=1
+        ;;
+      --eula=*)
+        EULA_VALUE="${1#*=}"
+        ;;
+      --force)
+        FORCE=1
+        ;;
+      --dry-run)
+        DRY_RUN=1
+        ;;
+      --ram)
+        RAM_SIZE="$2"
+        shift
+        ;;
+      --verbose)
+        LOG_VERBOSE=2
+        ;;
+      --quiet)
+        LOG_VERBOSE=0
+        ;;
+      --log-file)
+        LOG_FILE="$2"
+        shift
+        ;;
+      --world)
+        WORLD_NAME="$2"
+        shift
+        ;;
+      --restore)
+        RESTORE_ZIP="$2"
+        shift
+        ;;
+      --pre-backup)
+        PRE_BACKUP=1
+        ;;
+      --auto-download-mods)
+        AUTO_DOWNLOAD_MODS=1
+        ;;
+      *)
+        # Unknown or positional argument
+        ;;
+    esac
+    shift
+  done
     case "$1" in
       --ram)
         shift; RAM_SIZE="$1" ;;
@@ -607,6 +668,203 @@ HAS_MANIFEST=$(find "$WORK" -maxdepth 3 -name manifest.json | head -n1 || true)
 # PATH 1: Server-Pack Installation
 ################################################################################
 if [ -n "$HAS_START" ]; then
+  log_info "[2/7] Server files detected."
+  # Try to detect MC version from server jar name or manifest
+  MC_VER=$(ls minecraft_server.*.jar 2>/dev/null | grep -o '[0-9.]*' | head -n1 || true)
+  [ -z "$MC_VER" ] && MC_VER=$(find "$WORK" -name manifest.json -exec jq -r '.minecraft.version // empty' {} \; 2>/dev/null | head -n1 || true)
+  [ -z "$MC_VER" ] && MC_VER=$(ls forge-*.jar 2>/dev/null | grep -o '1\.[0-9.]*' | head -n1 || true)
+
+  # Setup Java based on detected MC version
+  if [ -n "$MC_VER" ]; then
+    setup_java "$MC_VER"
+  else
+    log_warn "Could not detect Minecraft version. You may need to install the correct Java version manually."
+  fi
+  # Move all server content up
+  # Copy server content into current directory and remove workdir after success
+  run rsync -a "$WORK"/ ./ 2>/dev/null || true
+  run rm -rf "$WORK"
+
+  # Make scripts executable
+  run find . -maxdepth 1 -type f -name "*.sh" -exec chmod +x {} \;
+
+  # Ask to accept EULA (interactive); if no tty, default to previous behavior (yes)
+  # EULA handling with flags/env
+  if [ -n "$EULA_VALUE" ]; then
+    if truthy "$EULA_VALUE"; then write_file eula.txt "eula=true"; else write_file eula.txt "eula=false"; fi
+  elif [ "$NO_EULA_PROMPT" = 1 ]; then
+    if truthy "${EULA:-$AUTO_ACCEPT_EULA}"; then write_file eula.txt "eula=true"; else write_file eula.txt "eula=false"; fi
+  else
+    if ask_yes_no "Accept Minecraft EULA?" "yes"; then write_file eula.txt "eula=true"; else write_file eula.txt "eula=false"; fi
+  fi
+
+  # Ask whether to run server once now to finish setup. If no tty, default to previous behavior (yes)
+  if ask_yes_no "Run server once now to finish setup (recommended)?" "$AUTO_FIRST_RUN"; then
+    run ./startserver.sh || true
+    run ./start.sh || true
+    if [ -n "$JAR" ]; then run java -jar "$JAR" nogui || true; fi
+  else
+    log_warn "Skipping first run. You can start the server later with ./start.sh"
+  fi
+
+  # Optionally add OP
+  op_user_if_configured || true
+
+  # Ensure a neutral start.sh exists (overwrite/create). It will prefer existing startserver.sh or start.sh if executable,
+  # otherwise it will start the detected server jar.
+  SRVJAR="$(detect_server_jar)"
+  # Store the detected jar name in a file so start.sh can find it later
+  write_file .server_jar "$SRVJAR"
+  if [ "$DRY_RUN" = 1 ]; then
+    log_info "[DRY-RUN] would write start.sh (server-pack branch)"
+  else
+    cat > start.sh <<"EOFMARKER1"
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")"
+
+# If an existing startserver.sh exists and is executable, use it.
+if [ -x ./startserver.sh ]; then
+  exec ./startserver.sh "$@"
+fi
+
+# If there is a user-provided start.sh (this file may be overwritten intentionally), try to exec it if different.
+if [ -x ./start.sh ] && [ "$(readlink -f "$0")" != "$(readlink -f ./start.sh)" ]; then
+  exec ./start.sh "$@"
+fi
+
+# Function to detect server jar, copied from main script for standalone use
+detect_server_jar() {
+  local j
+  # First priority: explicit modded server jars
+  j=$(ls -1 forge-*-server*.jar forge-*.jar 2>/dev/null | grep -v installer | head -n1 || true)
+  [ -n "$j" ] || j=$(ls -1 neoforge-*-server*.jar neoforge-*.jar 2>/dev/null | grep -v installer | head -n1 || true)
+  [ -n "$j" ] || j=$(ls -1 fabric-server-launch.jar fabric-server*.jar 2>/dev/null | head -n1 || true)
+  [ -n "$j" ] || j=$(ls -1 quilt-server-launch.jar quilt-server*.jar 2>/dev/null | head -n1 || true)
+  [ -n "$j" ] || j=$(ls -1 *forge-*.jar 2>/dev/null | grep -v installer | head -n1 || true)
+  [ -n "$j" ] || j=$(ls -1 run*.jar 2>/dev/null | head -n1 || true)
+  if [ -n "$j" ]; then printf '%s' "$j"; return 0; fi
+
+  # Second priority: server jars excluding vanilla minecraft_server
+  j=$(ls -1 *-server*.jar 2>/dev/null | grep -v "minecraft_server" | head -n1 || true)
+
+  # fallback: largest jar excluding installer jars
+  j=$(ls -S *.jar 2>/dev/null | grep -v -i installer | head -n1 || true)
+  printf '%s' "$j"
+}
+
+# First try to read the jar name from the stored file
+if [ -r .server_jar ]; then
+  JAR=$(cat .server_jar)
+else
+  # If file not found, detect it again
+  JAR=$(detect_server_jar)
+fi
+
+# Validate jar exists
+if [ ! -f "$JAR" ]; then
+  echo "Server jar not found: $JAR" >&2
+  echo "Trying to detect again..." >&2
+  JAR=$(detect_server_jar)
+  if [ ! -f "$JAR" ]; then
+    echo "No valid server jar found!" >&2
+    exit 1
+  fi
+  # Update the stored jar name
+  echo "$JAR" > .server_jar
+fi
+
+# Use dynamic memory allocation (75% of system RAM) unless overridden
+get_memory_args() {
+  local mem_kb mem_mb mem_target
+  if [ -r /proc/meminfo ]; then
+    mem_kb=$(grep '^MemTotal:' /proc/meminfo | awk '{print $2}')
+    mem_mb=$((mem_kb / 1024))
+  elif command -v sysctl >/dev/null 2>&1; then
+    mem_mb=$(sysctl -n hw.memsize 2>/dev/null | awk '{print int($1/1024/1024)}' || echo 0)
+  elif command -v wmic >/dev/null 2>&1; then
+    mem_mb=$(wmic computersystem get totalphysicalmemory 2>/dev/null | grep -v Total | awk '{print int($1/1024/1024)}' || echo 0)
+  else
+    echo "-Xms4G -Xmx8G"
+    return 0
+  fi
+  [ -z "$mem_mb" ] || [ "$mem_mb" -lt 1024 ] && { echo "-Xms4G -Xmx8G"; return 0; }
+  mem_target=$((mem_mb * 75 / 100))
+  [ "$mem_target" -lt 4096 ] && mem_target=4096
+  [ "$mem_target" -gt 32768 ] && mem_target=32768
+  echo "-Xms${mem_target}M -Xmx${mem_target}M"
+}
+
+JAVA_ARGS="${JAVA_ARGS:-$(get_memory_args)}"
+echo "Starting server with jar: $JAR"
+echo "Memory settings: $JAVA_ARGS"
+exec java $JAVA_ARGS -jar "$JAR" nogui
+EOFMARKER1
+  fi
+  chmod +x start.sh
+
+  echo ""
+  echo "[7/7] Server-Pack Installation abgeschlossen!"
+  echo "========================================="
+  echo "Der Server ist bereit."
+  echo "Starten mit: ./start.sh"
+  echo "========================================="
+
+  # --- SYSTEMD GENERATION ---
+  if [ "$SYSTEMD" = 1 ]; then
+    log_info "Generating systemd service file..."
+    mkdir -p dist
+    SERVICE_PATH="dist/minecraft.service"
+    SERVICE_USER="$(id -un)"
+    SERVICE_WORKDIR="$(pwd)"
+    SERVICE_JAVA_ARGS="${JAVA_ARGS:-$(get_memory_args)}"
+    cat > "$SERVICE_PATH" <<EOF
+[Unit]
+Description=Minecraft Server
+After=network.target
+
+[Service]
+Type=simple
+User=$SERVICE_USER
+WorkingDirectory=$SERVICE_WORKDIR
+ExecStart=$SERVICE_WORKDIR/start.sh
+Restart=on-failure
+Environment="JAVA_ARGS=$SERVICE_JAVA_ARGS"
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    log_info "Service file written to $SERVICE_PATH"
+    log_info "To install: sudo cp $SERVICE_PATH /etc/systemd/system/minecraft.service && sudo systemctl enable --now minecraft.service"
+    # Collision detection for systemd
+    if command -v systemctl >/dev/null 2>&1; then
+      if systemctl is-active --quiet minecraft; then
+        log_warn "systemd service 'minecraft' is already active. Status: $(systemctl status minecraft | head -n 5)"
+      elif systemctl is-enabled --quiet minecraft; then
+        log_warn "systemd service 'minecraft' is enabled but not active."
+      fi
+    fi
+  fi
+
+  # --- TMUX GENERATION ---
+  if [ "$TMUX" = 1 ]; then
+    require_cmd tmux
+    # Check if session exists
+    if tmux has-session -t minecraft 2>/dev/null; then
+      log_warn "tmux session 'minecraft' already exists. Attach with: tmux attach -t minecraft"
+    else
+      # Check if systemd service is active before starting tmux
+      if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet minecraft; then
+        log_warn "systemd service 'minecraft' is already running. Not starting tmux session to avoid conflict."
+      else
+        log_info "Starting server in new tmux session 'minecraft'..."
+        tmux new-session -d -s minecraft "$(pwd)/start.sh"
+        log_info "tmux session 'minecraft' started. Attach with: tmux attach -t minecraft"
+      fi
+    fi
+  fi
+  exit 0
+fi
   log_info "[2/7] Server files detected."
   # Try to detect MC version from server jar name or manifest
   MC_VER=$(ls minecraft_server.*.jar 2>/dev/null | grep -o '[0-9.]*' | head -n1 || true)
