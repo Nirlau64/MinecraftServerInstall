@@ -8,6 +8,18 @@ This script automates the setup of a Minecraft server, including support for For
 * Tested with both **Forge** and **Fabric** mod loaders.
 * Includes configuration and startup automation.
 
+## Quick config (edit at top of the script)
+
+The setup script now has a clear CONFIG section at the top with common settings:
+
+- ZIP: path to the modpack zip to install (can still be provided as CLI arg)
+- OP_USERNAME: player name to grant operator rights to automatically (optional)
+- OP_LEVEL: operator permission level (1-4, default 4)
+- AUTO_ACCEPT_EULA: yes/no default used when no terminal is attached
+- AUTO_FIRST_RUN: yes/no default used when no terminal is attached
+- JAVA_ARGS: optional custom JVM args (else memory is sized dynamically)
+- MEMORY_PERCENT, MIN_MEMORY_MB, MAX_MEMORY_MB: control dynamic memory sizing
+
 ## Requirements
 
 * A Linux server or VPS with sufficient storage and memory.
