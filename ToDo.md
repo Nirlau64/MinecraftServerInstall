@@ -95,10 +95,10 @@ Akzeptanzkriterien:
 
 Ziel: Sinnvolle Defaults und einfache Steuerung über Datei.
 
-- [ ] Falls `server.properties` fehlt: Template mit gängigen Einstellungen (difficulty, pvp, motd, view-distance, white-list, etc.).
-- [ ] Konfigurationsquellen: `.env` (KEY=VALUE) optional `server.yml`.
-- [ ] Parser (Bash/awk/kleines Helferskript) liest Werte und aktualisiert gezielt `server.properties` (idempotent).
-- [ ] Level-Name/Seed/World-Type abbilden (Übergang zu Multi-World).
+- [x] Falls `server.properties` fehlt: Template mit gängigen Einstellungen (difficulty, pvp, motd, view-distance, white-list, etc.).
+- [x] Konfigurationsquellen: `.env` (KEY=VALUE) optional `server.yml`.
+- [x] Parser (Bash/awk/kleines Helferskript) liest Werte und aktualisiert gezielt `server.properties` (idempotent).
+- [x] Level-Name/Seed/World-Type abbilden (Übergang zu Multi-World).
 
 Akzeptanzkriterien:
 - Änderungen in `.env` (z. B. `DIFFICULTY=hard`) werden korrekt in `server.properties` übernommen.

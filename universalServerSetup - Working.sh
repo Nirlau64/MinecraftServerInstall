@@ -28,6 +28,20 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 # CONFIGURATION SECTION (User-editable)
 # -----------------------------------------------------------------------------
+# SERVER.PROPERTIES DEFAULTS (User-editable, can be overridden by CLI/env)
+# -----------------------------------------------------------------------------
+PROP_MOTD="Modded Minecraft Server"
+PROP_DIFFICULTY="normal"
+PROP_PVP="true"
+PROP_VIEW_DISTANCE="10"
+PROP_WHITE_LIST="false"
+PROP_MAX_PLAYERS="20"
+PROP_SPAWN_PROTECTION="0"
+PROP_ALLOW_NETHER="true"
+PROP_LEVEL_NAME="world"
+PROP_LEVEL_SEED=""
+PROP_LEVEL_TYPE="default"
+# -----------------------------------------------------------------------------
 
 # Path to the modpack ZIP file to install. Can be set via CLI argument or environment variable ZIP_OVERRIDE.
 ZIP="${ZIP_OVERRIDE:-pack.zip}"
@@ -73,6 +87,24 @@ WORK="${WORK:-${SRVDIR}/_work}"
 
 # -----------------------------------------------------------------------------
 # Runtime flags (populated via CLI/env)
+# -----------------------------------------------------------------------------
+# CLI ARGUMENTS FOR SERVER.PROPERTIES
+# -----------------------------------------------------------------------------
+for arg in "$@"; do
+  case "$arg" in
+    --motd=*) PROP_MOTD="${arg#--motd=}" ;;
+    --difficulty=*) PROP_DIFFICULTY="${arg#--difficulty=}" ;;
+    --pvp=*) PROP_PVP="${arg#--pvp=}" ;;
+    --view-distance=*) PROP_VIEW_DISTANCE="${arg#--view-distance=}" ;;
+    --white-list=*) PROP_WHITE_LIST="${arg#--white-list=}" ;;
+    --max-players=*) PROP_MAX_PLAYERS="${arg#--max-players=}" ;;
+    --spawn-protection=*) PROP_SPAWN_PROTECTION="${arg#--spawn-protection=}" ;;
+    --allow-nether=*) PROP_ALLOW_NETHER="${arg#--allow-nether=}" ;;
+    --level-name=*) PROP_LEVEL_NAME="${arg#--level-name=}" ;;
+    --level-seed=*) PROP_LEVEL_SEED="${arg#--level-seed=}" ;;
+    --level-type=*) PROP_LEVEL_TYPE="${arg#--level-type=}" ;;
+  esac
+done
 # -----------------------------------------------------------------------------
 # These are set by command-line arguments or environment variables
 ASSUME_YES=0
@@ -1244,6 +1276,74 @@ echo "Erstelle start.sh Script..."
 
 # Optionally add OP entry after (or regardless of) first run
 op_user_if_configured || true
+
+# -----------------------------------------------------------------------------
+# Server properties template creation (5)
+# -----------------------------------------------------------------------------
+create_server_properties_template() {
+  local file="server.properties"
+  if [ -f "$file" ]; then
+    log_info "server.properties already exists. Skipping template creation."
+    return 0
+  fi
+  log_info "Creating server.properties template with sensible defaults..."
+  write_file "$file" "# Minecraft server properties (auto-generated)\n"
+  append_file "$file" "# For details see https://minecraft.fandom.com/wiki/Server.properties\n"
+  append_file "$file" "# Generated: $(date '+%Y-%m-%d %H:%M:%S')\n"
+  append_file "$file" "motd=$PROP_MOTD\ndifficulty=$PROP_DIFFICULTY\npvp=$PROP_PVP\nview-distance=$PROP_VIEW_DISTANCE\nwhite-list=$PROP_WHITE_LIST\nmax-players=$PROP_MAX_PLAYERS\nspawn-protection=$PROP_SPAWN_PROTECTION\nallow-nether=$PROP_ALLOW_NETHER\nlevel-name=$PROP_LEVEL_NAME\nlevel-seed=$PROP_LEVEL_SEED\nlevel-type=$PROP_LEVEL_TYPE\n"
+  log_info "server.properties template created."
+}
+
+# Call template creation after OP setup, before final log
+create_server_properties_template
+update_server_properties_from_env() {
+  local env_file=".env"
+  local prop_file="server.properties"
+  [ -f "$env_file" ] || return 0
+  log_info "Updating server.properties from .env..."
+  while IFS='=' read -r key value; do
+    # Skip comments and empty lines
+    [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
+    # Only update known keys
+    case "$key" in
+      DIFFICULTY|PVP|MOTD|VIEW_DISTANCE|WHITE_LIST|MAX_PLAYERS|SPAWN_PROTECTION|ALLOW_NETHER|LEVEL_NAME|LEVEL_SEED|LEVEL_TYPE)
+        # Map env key to server.properties key
+        prop_key=$(echo "$key" | tr '[:upper:]_' '[:lower:]-')
+        prop_key=${prop_key//-/_}
+        # Special cases for mapping
+        case "$key" in
+          DIFFICULTY) prop_key="difficulty";;
+          PVP) prop_key="pvp";;
+          MOTD) prop_key="motd";;
+          VIEW_DISTANCE) prop_key="view-distance";;
+          WHITE_LIST) prop_key="white-list";;
+          MAX_PLAYERS) prop_key="max-players";;
+          SPAWN_PROTECTION) prop_key="spawn-protection";;
+          ALLOW_NETHER) prop_key="allow-nether";;
+          LEVEL_NAME) prop_key="level-name";;
+          LEVEL_SEED) prop_key="level-seed";;
+          LEVEL_TYPE) prop_key="level-type";;
+        esac
+        # Idempotent update: replace or add
+        if grep -q "^$prop_key=" "$prop_file"; then
+          sed -i "s|^$prop_key=.*|$prop_key=$value|" "$prop_file"
+        else
+          echo "$prop_key=$value" >> "$prop_file"
+        fi
+        ;;
+    esac
+  done < "$env_file"
+}
+update_server_properties_from_env
+  # Multi-world mapping: WORLD env sets level-name
+  if [ -n "$WORLD" ]; then
+    if grep -q "^level-name=" "$prop_file"; then
+      sed -i "s|^level-name=.*|level-name=$WORLD|" "$prop_file"
+    else
+      echo "level-name=$WORLD" >> "$prop_file"
+    fi
+    log_info "Set level-name from WORLD env: $WORLD"
+  fi
 
 log_info "[7/7] Done. Use start.sh to run the server."
 if [ "$DRY_RUN" = 1 ]; then
