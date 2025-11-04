@@ -248,14 +248,27 @@ Ziel: Eine kleine, optionale (standardmäßig aktivierte) grafische Oberfläche 
   3. **Welt-Management:** Verwaltung von Welten und Backups
   4. **Mod-Management:** Übersicht und Verwaltung installierter Mods
   5. **Logs & Monitoring:** Log-Viewer mit verschiedenen Log-Dateien
+- **Vollständige Pre-Setup Integration:**
+  - **Setup-Wizard:** GUI kann vor Server-Installation gestartet werden
+  - **Intelligente Erkennung:** Unterscheidet zwischen neuer Installation und existierendem Server
+  - **Welcome-Message:** Benutzerführung für neue Installationen
+  - **Setup-Validation:** Validierung aller Einstellungen vor Setup-Start
+  - **Visuelle Fortschrittsanzeige:** Progress-Bar und Status-Updates während Setup
+  - **Automatische Aktualisierung:** Alle Tabs werden nach erfolgreichem Setup aktualisiert
+- **Robuste Launchers:**
+  - `start_gui.sh`: Bash-Skript mit Dependency-Checks und Fehlerbehebungshinweisen
+  - `start_gui.py`: Python-Launcher mit automatischer Pfaderkennung
+  - Automatische Verzeichniserstellung falls nicht vorhanden
 - **Konfigurationsspeicherung:** Einstellungen werden in .env-Dateien gespeichert
 - **Robuste Integration:** Automatischer Start nach Setup, Cleanup bei Fehlern
 - **Cross-Platform:** Funktioniert auf Linux, macOS und Windows
 
-Akzeptanzkriterien: ✅
+Akzeptanzkriterien: ✅✅
 - Nach dem Setup ist die GUI verfügbar und kann alle Verwaltungsaufgaben ausführen
 - GUI ist optional und kann für reine Server-/CI-Nutzung deaktiviert werden
 - **Zusätzlich:** GUI ermöglicht vollständige Rekonfiguration des Servers ohne Kommandozeile
+- **🎯 VOLLSTÄNDIGE PRE-SETUP INTEGRATION:** GUI kann VOR dem Setup gestartet werden und das komplette Setup anstoßen
+- **🚀 EINHEITLICHER WORKFLOW:** Benutzer können ausschließlich über die GUI arbeiten - von der ersten Installation bis zur laufenden Verwaltung
 
 ---
 

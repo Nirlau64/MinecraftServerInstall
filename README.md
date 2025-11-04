@@ -24,6 +24,18 @@ It supports **Forge**, **NeoForge**, **Fabric**, and **Quilt** loaders and can h
 
 ## Quick Start
 
+### GUI Mode (Recommended for beginners)
+```bash
+# Start the GUI - works even before server setup
+./start_gui.sh
+
+# Or use Python directly
+python3 tools/server_gui.py
+
+# GUI handles everything: configuration, setup, and management
+```
+
+### Command Line Mode
 ```bash
 # Basic usage with a modpack
 ./universalServerSetup.sh MyModpack.zip
@@ -72,6 +84,52 @@ The setup script has a comprehensive CONFIG section at the top:
 - `PROP_MAX_PLAYERS`: Maximum number of players (default: 20)
 - And many more server.properties options...
 
+## Graphical User Interface (GUI)
+
+### 🎮 Complete Server Management GUI
+
+This project includes a **comprehensive graphical interface** that allows you to manage your entire Minecraft server without using the command line!
+
+**Key Features:**
+- **Complete Setup Wizard**: Configure and install servers entirely through GUI
+- **Real-time Configuration**: Edit all server properties visually  
+- **Server Control**: Start/Stop/Restart with live console output
+- **World Management**: Create backups, restore worlds, switch between worlds
+- **Mod Management**: View installed mods, add/remove mods, auto-download from modpacks
+- **Log Viewer**: Browse all server logs and installation logs
+- **Configuration Profiles**: Save/load different server configurations
+
+**Starting the GUI:**
+```bash
+# Easy launcher (recommended)
+./start_gui.sh
+
+# Direct Python execution  
+python3 tools/server_gui.py [server_directory]
+
+# From any directory
+python3 /path/to/tools/start_gui.py /path/to/server
+```
+
+**GUI Workflow:**
+1. **Start GUI** before or after server setup
+2. **Configure Settings** in the "Setup & Configuration" tab
+3. **Select Modpack** (optional) or leave empty for vanilla
+4. **Run Setup** - GUI executes the setup script with your settings
+5. **Manage Server** using the other tabs after setup
+
+The GUI **automatically handles**:
+- ✅ Server setup validation and error checking
+- ✅ Progress tracking with visual feedback  
+- ✅ Configuration persistence (saves to `.env` files)
+- ✅ Live server console with command input
+- ✅ Automatic refresh after setup completion
+- ✅ Headless server detection (disables GUI appropriately)
+
+**GUI Requirements:**
+- Python 3.6+ with tkinter (usually included)
+- For headless servers: X11 forwarding (`ssh -X`) or local display
+
 ## Requirements
 
 * Linux system or VPS with sufficient storage and port `25565` available
@@ -79,6 +137,7 @@ The setup script has a comprehensive CONFIG section at the top:
 * `sudo` rights for Java installation (if needed)
 * Internet connection for downloads
 * Write permissions in the working directory
+* **For GUI**: Python 3.6+ with tkinter (auto-detected)
 
 ## Installation & Usage
 

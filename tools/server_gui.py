@@ -62,6 +62,9 @@ class MinecraftServerGUI:
         self.server_process = None
         self.server_status = "stopped"
         
+        # Check if this is a fresh installation or existing server
+        self.is_existing_server = self.check_existing_server()
+        
         # Initialize GUI components
         self.setup_ui()
         self.load_current_config()
@@ -69,6 +72,48 @@ class MinecraftServerGUI:
         
         # Start status monitoring
         self.monitor_server()
+        
+        # Show welcome message for new setups
+        if not self.is_existing_server:
+            self.show_welcome_message()
+    
+    def check_existing_server(self):
+        """Check if this directory already contains a Minecraft server"""
+        # Look for typical server files
+        server_indicators = [
+            "server.properties",
+            "eula.txt", 
+            "start.sh",
+            ".server_jar"
+        ]
+        
+        # Check for any server jar files
+        jar_files = list(self.server_dir.glob("*.jar"))
+        server_jars = [jar for jar in jar_files if any(name in jar.name.lower() 
+                      for name in ['forge', 'fabric', 'quilt', 'neoforge', 'server'])]
+        
+        # Check for mods directory
+        mods_dir = self.server_dir / "mods"
+        
+        return (any((self.server_dir / indicator).exists() for indicator in server_indicators) or 
+                len(server_jars) > 0 or 
+                (mods_dir.exists() and any(mods_dir.glob("*.jar"))))
+    
+    def show_welcome_message(self):
+        """Show welcome message for new server setups"""
+        welcome_msg = """Welcome to Minecraft Server Manager!
+
+This appears to be a new server directory. To get started:
+
+1. Configure your server settings in the 'Setup & Configuration' tab
+2. Select a modpack ZIP file (or leave empty for vanilla)
+3. Click 'Run Setup' to install your server
+4. Use the other tabs to manage your server after setup
+
+The GUI will guide you through the entire process!"""
+        
+        # Show message after a short delay to let GUI initialize
+        self.root.after(1000, lambda: messagebox.showinfo("Welcome", welcome_msg))
     
     def setup_ui(self):
         """Create the main user interface"""
@@ -235,21 +280,50 @@ class MinecraftServerGUI:
         modpack_frame = ttk.LabelFrame(scrollable_frame, text="Modpack Installation", padding=10)
         modpack_frame.grid(row=4, column=0, columnspan=2, sticky='ew', padx=5, pady=5)
         
+        # Add helpful text for new users
+        if not self.is_existing_server:
+            help_text = ttk.Label(modpack_frame, text="💡 Select a modpack ZIP file, or leave empty for vanilla server", 
+                                 foreground="blue")
+            help_text.grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 5))
+        
         # Modpack file selection
-        ttk.Label(modpack_frame, text="Modpack ZIP:").grid(row=0, column=0, sticky='w', pady=2)
+        row_offset = 1 if not self.is_existing_server else 0
+        ttk.Label(modpack_frame, text="Modpack ZIP:").grid(row=row_offset, column=0, sticky='w', pady=2)
         self.modpack_var = tk.StringVar()
         modpack_entry_frame = ttk.Frame(modpack_frame)
-        modpack_entry_frame.grid(row=0, column=1, sticky='ew', pady=2)
+        modpack_entry_frame.grid(row=row_offset, column=1, sticky='ew', pady=2)
         
         ttk.Entry(modpack_entry_frame, textvariable=self.modpack_var).grid(row=0, column=0, sticky='ew')
         ttk.Button(modpack_entry_frame, text="Browse", command=self.browse_modpack).grid(row=0, column=1, padx=(5,0))
         modpack_entry_frame.columnconfigure(0, weight=1)
         
+        # Setup status and progress
+        status_frame = ttk.LabelFrame(scrollable_frame, text="Setup Status", padding=10)
+        status_frame.grid(row=5, column=0, columnspan=2, sticky='ew', padx=5, pady=5)
+        
+        self.setup_status_var = tk.StringVar()
+        if self.is_existing_server:
+            self.setup_status_var.set("✅ Server already configured - Ready to use")
+        else:
+            self.setup_status_var.set("⏳ Not configured - Run setup to install server")
+        
+        self.setup_status_label = ttk.Label(status_frame, textvariable=self.setup_status_var)
+        self.setup_status_label.pack(anchor='w')
+        
+        # Progress bar for setup
+        self.setup_progress = ttk.Progressbar(status_frame, mode='indeterminate')
+        self.setup_progress.pack(fill='x', pady=(5, 0))
+        self.setup_progress.pack_forget()  # Hide initially
+        
         # Action buttons
         button_frame = ttk.Frame(scrollable_frame)
-        button_frame.grid(row=5, column=0, columnspan=2, pady=20)
+        button_frame.grid(row=6, column=0, columnspan=2, pady=20)
         
-        ttk.Button(button_frame, text="Run Setup", command=self.run_setup).grid(row=0, column=0, padx=5)
+        # Make setup button more prominent for new installations
+        setup_text = "🚀 Run Setup" if not self.is_existing_server else "🔄 Reconfigure Server"
+        self.setup_button = ttk.Button(button_frame, text=setup_text, command=self.run_setup)
+        self.setup_button.grid(row=0, column=0, padx=5)
+        
         ttk.Button(button_frame, text="Save Configuration", command=self.save_config).grid(row=0, column=1, padx=5)
         ttk.Button(button_frame, text="Load Configuration", command=self.load_config).grid(row=0, column=2, padx=5)
         ttk.Button(button_frame, text="Reset to Defaults", command=self.reset_config).grid(row=0, column=3, padx=5)
@@ -615,6 +689,10 @@ class MinecraftServerGUI:
             messagebox.showerror("Error", f"Setup script not found: {self.setup_script}")
             return
         
+        # Validate configuration before starting
+        if not self.validate_setup_config():
+            return
+        
         # Build command line arguments
         cmd = ["bash", str(self.setup_script)]
         
@@ -654,9 +732,21 @@ class MinecraftServerGUI:
         cmd.extend([f"--level-type={self.world_type_var.get()}"])
         cmd.extend([f"--white-list={str(self.whitelist_var.get()).lower()}"])
         
+        # Add --no-gui to prevent recursive GUI startup
+        cmd.append("--no-gui")
+        
+        # Add --yes for non-interactive mode (since we're running from GUI)
+        cmd.append("--yes")
+        
         # Add modpack file if specified
         if self.modpack_var.get():
             cmd.append(self.modpack_var.get())
+        
+        # Update UI for setup start
+        self.setup_button.config(state='disabled')
+        self.setup_status_var.set("🔄 Running server setup...")
+        self.setup_progress.pack(fill='x', pady=(5, 0))
+        self.setup_progress.start()
         
         # Run setup in separate thread
         def run_setup_thread():
@@ -679,18 +769,134 @@ class MinecraftServerGUI:
                 
                 process.wait()
                 
+                # Update UI based on result
                 if process.returncode == 0:
-                    self.root.after(0, lambda: self.log_message("Setup completed successfully!"))
-                    self.root.after(0, lambda: messagebox.showinfo("Success", "Server setup completed successfully!"))
+                    self.root.after(0, lambda: self.setup_completed_successfully())
                 else:
-                    self.root.after(0, lambda: self.log_message(f"Setup failed with exit code {process.returncode}"))
-                    self.root.after(0, lambda: messagebox.showerror("Error", f"Setup failed with exit code {process.returncode}"))
+                    self.root.after(0, lambda: self.setup_failed(process.returncode))
                 
             except Exception as e:
-                self.root.after(0, lambda: self.log_message(f"Setup error: {e}"))
-                self.root.after(0, lambda: messagebox.showerror("Error", f"Setup failed: {e}"))
+                self.root.after(0, lambda: self.setup_error(e))
         
         threading.Thread(target=run_setup_thread, daemon=True).start()
+    
+    def setup_completed_successfully(self):
+        """Handle successful setup completion"""
+        self.setup_progress.stop()
+        self.setup_progress.pack_forget()
+        self.setup_button.config(state='normal', text="🔄 Reconfigure Server")
+        self.setup_status_var.set("✅ Server setup completed successfully!")
+        
+        # Update server detection
+        self.is_existing_server = True
+        
+        # Refresh all tabs
+        self.refresh_worlds()
+        self.refresh_mods()
+        self.refresh_backups()
+        self.refresh_logs()
+        
+        self.log_message("Setup completed successfully!")
+        messagebox.showinfo("Success", "Server setup completed successfully!\n\nYou can now use the other tabs to manage your server.")
+    
+    def setup_failed(self, return_code):
+        """Handle setup failure"""
+        self.setup_progress.stop()
+        self.setup_progress.pack_forget()
+        self.setup_button.config(state='normal')
+        self.setup_status_var.set(f"❌ Setup failed (exit code {return_code})")
+        
+        self.log_message(f"Setup failed with exit code {return_code}")
+        messagebox.showerror("Setup Failed", f"Setup failed with exit code {return_code}\n\nCheck the logs for details.")
+    
+    def setup_error(self, error):
+        """Handle setup error"""
+        self.setup_progress.stop()
+        self.setup_progress.pack_forget()
+        self.setup_button.config(state='normal')
+        self.setup_status_var.set(f"❌ Setup error: {error}")
+        
+        self.log_message(f"Setup error: {error}")
+        messagebox.showerror("Setup Error", f"Setup failed with error:\n\n{error}")
+    
+    def validate_setup_config(self):
+        """Validate configuration before running setup"""
+        errors = []
+        warnings = []
+        
+        # Check EULA acceptance
+        if not self.eula_var.get():
+            errors.append("EULA must be accepted to run a Minecraft server")
+        
+        # Check modpack file if specified
+        if self.modpack_var.get():
+            modpack_path = Path(self.modpack_var.get())
+            if not modpack_path.exists():
+                errors.append(f"Modpack file not found: {modpack_path}")
+            elif not modpack_path.suffix.lower() == '.zip':
+                warnings.append(f"Modpack file should be a ZIP archive: {modpack_path}")
+        
+        # Check RAM allocation
+        if not self.ram_auto_var.get():
+            ram_size = self.ram_var.get().strip()
+            if ram_size:
+                # Basic RAM format validation
+                import re
+                if not re.match(r'^\d+[GgMm]?$', ram_size):
+                    errors.append("RAM size must be in format like '4G', '8192M', etc.")
+                else:
+                    # Convert to MB for validation
+                    if ram_size.lower().endswith('g'):
+                        ram_mb = int(ram_size[:-1]) * 1024
+                    elif ram_size.lower().endswith('m'):
+                        ram_mb = int(ram_size[:-1])
+                    else:
+                        ram_mb = int(ram_size)
+                    
+                    if ram_mb < 1024:
+                        warnings.append("RAM allocation below 1GB may cause server issues")
+                    elif ram_mb > 32768:
+                        warnings.append("RAM allocation above 32GB may not be necessary")
+        
+        # Check server directory permissions
+        try:
+            test_file = self.server_dir / ".permission_test"
+            test_file.write_text("test")
+            test_file.unlink()
+        except PermissionError:
+            errors.append(f"No write permission in server directory: {self.server_dir}")
+        except Exception as e:
+            warnings.append(f"Could not verify directory permissions: {e}")
+        
+        # Check for existing server files if force is not enabled
+        if not self.force_var.get() and self.is_existing_server:
+            warnings.append("Existing server files found. Enable 'Force overwrite' if you want to replace them.")
+        
+        # Display errors and warnings
+        if errors:
+            error_msg = "Configuration errors:\n\n" + "\n".join(f"• {error}" for error in errors)
+            messagebox.showerror("Configuration Error", error_msg)
+            return False
+        
+        if warnings:
+            warning_msg = "Configuration warnings:\n\n" + "\n".join(f"• {warning}" for warning in warnings)
+            warning_msg += "\n\nDo you want to continue anyway?"
+            if not messagebox.askyesno("Configuration Warning", warning_msg):
+                return False
+        
+        # Final confirmation for setup
+        if self.is_existing_server and not self.force_var.get():
+            confirm_msg = "This will set up a Minecraft server in the current directory.\n\n"
+            if self.modpack_var.get():
+                confirm_msg += f"Modpack: {Path(self.modpack_var.get()).name}\n"
+            confirm_msg += f"RAM: {'Auto (75% system RAM)' if self.ram_auto_var.get() else self.ram_var.get()}\n"
+            confirm_msg += f"World: {self.world_name_var.get()}\n\n"
+            confirm_msg += "Continue with setup?"
+            
+            if not messagebox.askyesno("Confirm Setup", confirm_msg):
+                return False
+        
+        return True
     
     # Server Control Methods
     def start_server(self):

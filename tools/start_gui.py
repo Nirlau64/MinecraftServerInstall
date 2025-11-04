@@ -73,6 +73,16 @@ def main():
         else:
             server_dir = str(current_dir)
     
+    # Create server directory if it doesn't exist
+    server_path = Path(server_dir)
+    if not server_path.exists():
+        try:
+            server_path.mkdir(parents=True)
+            print(f"Created server directory: {server_path}")
+        except Exception as e:
+            print(f"Error creating server directory: {e}")
+            return 1
+    
     # Check if tkinter is available
     try:
         import tkinter
