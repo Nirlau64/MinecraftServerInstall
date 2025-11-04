@@ -87,7 +87,7 @@ source lib/validation.sh
 
 ## 🚀 Migration-Strategie
 
-### **Phase 1: Logging & Validation auslagern** (1-2h)
+### **[x]Phase 1: Logging & Validation auslagern** (1-2h)
 1. `lib/logging.sh` erstellen
 2. `lib/validation.sh` erstellen  
 3. Main script entsprechend anpassen
