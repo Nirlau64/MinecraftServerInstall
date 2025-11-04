@@ -128,6 +128,9 @@ The script will automatically:
 - `--systemd`: Generate systemd service file
 - `--tmux`: Start server in tmux session
 
+#### Automatic Mod Download (Experimental)
+- `--auto-download-mods`: Automatically download mods from manifest.json using unofficial CurseForge endpoints
+
 #### World & Backup Management
 - `--world <name>`: Use specific world name
 - `--pre-backup`: Create backup before installation
@@ -202,6 +205,24 @@ The script will prompt for EULA acceptance and first run confirmation.
 # Restore from backup
 ./universalServerSetup\ -\ Working.sh --restore backups/survival-20241104-143022.zip
 ```
+
+### Automatic Mod Download (Experimental)
+```bash
+# Enable automatic mod downloading (Python 3 auto-installed if needed)
+./universalServerSetup\ -\ Working.sh --auto-download-mods MyClientExport.zip
+
+# Combined with other options
+./universalServerSetup\ -\ Working.sh --yes --eula=true --auto-download-mods --verbose MyClientExport.zip
+
+# Manual download of specific mods (standalone usage)
+python3 tools/cf_downloader.py manifest.json ./mods --verbose
+```
+
+**Note**: 
+- Automatic mod download is experimental and uses unofficial CurseForge endpoints
+- Python 3 is automatically installed if missing and removed after completion
+- Failed downloads are logged to `logs/missing-mods.txt` with manual download links
+- Requires `sudo` access for Python 3 installation if not already present
 
 ## Directory Structure
 
@@ -289,6 +310,17 @@ When using `--systemd`, generates `dist/minecraft.service` with:
 - Preservation of manual changes during script re-runs
 - Command-line overrides for all server properties
 
+### Automatic Mod Download (Experimental)
+- **Optional mod downloading**: Use `--auto-download-mods` with client exports
+- **Automatic Python 3 management**: Installs Python 3 if missing, removes it after completion
+- **Unofficial CurseForge endpoints**: Downloads mods directly from project/file IDs in manifest.json
+- **Intelligent fallback**: Falls back to latest compatible version if specific file not found
+- **Robust error handling**: Failed downloads don't break installation, logged to `logs/missing-mods.txt`
+- **Rate limiting**: Built-in delays and retry logic to avoid overwhelming servers
+- **Clean system state**: Automatically removes Python 3 if installed by the script
+- **Graceful degradation**: Falls back to manual installation if Python 3 installation fails
+- **Requirements**: None (Python 3 auto-installed if needed using system package manager)
+
 ## Supported Configurations
 
 ### Mod Loaders
@@ -347,9 +379,29 @@ chmod +x universalServerSetup\ -\ Working.sh
 # Run with appropriate user privileges
 ```
 
+**Automatic Mod Download Issues:**
+```bash
+# Python 3 is automatically installed/removed as needed
+# If installation fails, check system package manager access
+sudo apt update  # or equivalent for your system
+
+# Manual mod download if automatic fails
+python3 tools/cf_downloader.py manifest.json ./mods --verbose
+
+# Check failed downloads
+cat logs/missing-mods.txt
+
+# Force manual Python 3 installation if auto-install fails
+sudo apt install python3  # Ubuntu/Debian
+sudo dnf install python3  # Fedora
+sudo yum install python3  # CentOS/RHEL
+sudo pacman -S python     # Arch Linux
+```
+
 ### Log Analysis
 - Installation logs: `logs/install-YYYYMMDD-HHMMSS.log`
 - Server logs: `logs/latest.log`
+- Missing mods log: `logs/missing-mods.txt` (when using `--auto-download-mods`)
 - Debug mode: Use `--verbose` for detailed output
 - Dry run: Use `--dry-run` to preview changes
 

@@ -25,6 +25,15 @@
 
 set -euo pipefail
 
+# Trap to ensure Python 3 cleanup on exit
+cleanup_on_exit() {
+  if [ "${PYTHON3_INSTALLED_BY_SCRIPT:-0}" = "1" ]; then
+    echo "[INFO] Cleaning up Python 3 installed by script..."
+    cleanup_python3_if_installed
+  fi
+}
+trap cleanup_on_exit EXIT INT TERM
+
 # -----------------------------------------------------------------------------
 # CONFIGURATION SECTION (User-editable)
 # -----------------------------------------------------------------------------
@@ -119,6 +128,8 @@ FORCE=0
 DRY_RUN=0
 SYSTEMD=0
 TMUX=0
+AUTO_DOWNLOAD_MODS=0
+PYTHON3_INSTALLED_BY_SCRIPT=0  # Flag to track if we installed Python 3
 
 # -----------------------------------------------------------------------------
 # Logging helpers
@@ -694,6 +705,165 @@ setup_java() {
   log_info "Successfully installed Java $java_ver"
 }
 
+################################################################################
+# Python 3 Management Functions
+################################################################################
+
+# Function: install_python3_if_needed
+# Description: Checks for Python 3 and installs it if missing for mod downloads
+# Returns: 0 if Python 3 is available, exit 1 if installation failed
+install_python3_if_needed() {
+  # Check if Python 3 is already available
+  if command -v python3 >/dev/null 2>&1; then
+    log_info "Python 3 is already available: $(python3 --version 2>&1)"
+    return 0
+  fi
+
+  log_info "Python 3 not found, installing for automatic mod download..."
+  
+  # Set flag to remember we installed it
+  PYTHON3_INSTALLED_BY_SCRIPT=1
+  
+  if [ "$DRY_RUN" = "1" ]; then
+    log_info "[DRY-RUN] would install Python 3"
+    return 0
+  fi
+
+  # Install Python 3 based on package manager
+  if command -v apt-get >/dev/null 2>&1; then
+    log_info "Installing Python 3 via apt..."
+    if sudo apt-get update && sudo apt-get install -y python3 python3-minimal; then
+      log_info "Python 3 installed successfully via apt"
+    else
+      log_err "Failed to install Python 3 via apt"
+      PYTHON3_INSTALLED_BY_SCRIPT=0
+      return 1
+    fi
+  elif command -v dnf >/dev/null 2>&1; then
+    log_info "Installing Python 3 via dnf..."
+    if sudo dnf install -y python3; then
+      log_info "Python 3 installed successfully via dnf"
+    else
+      log_err "Failed to install Python 3 via dnf"
+      PYTHON3_INSTALLED_BY_SCRIPT=0
+      return 1
+    fi
+  elif command -v yum >/dev/null 2>&1; then
+    log_info "Installing Python 3 via yum..."
+    if sudo yum install -y python3; then
+      log_info "Python 3 installed successfully via yum"
+    else
+      log_err "Failed to install Python 3 via yum"
+      PYTHON3_INSTALLED_BY_SCRIPT=0
+      return 1
+    fi
+  elif command -v pacman >/dev/null 2>&1; then
+    log_info "Installing Python 3 via pacman..."
+    if sudo pacman -S --noconfirm python; then
+      log_info "Python 3 installed successfully via pacman"
+    else
+      log_err "Failed to install Python 3 via pacman"
+      PYTHON3_INSTALLED_BY_SCRIPT=0
+      return 1
+    fi
+  elif command -v zypper >/dev/null 2>&1; then
+    log_info "Installing Python 3 via zypper..."
+    if sudo zypper install -y python3; then
+      log_info "Python 3 installed successfully via zypper"
+    else
+      log_err "Failed to install Python 3 via zypper"
+      PYTHON3_INSTALLED_BY_SCRIPT=0
+      return 1
+    fi
+  elif command -v brew >/dev/null 2>&1; then
+    log_info "Installing Python 3 via Homebrew..."
+    if brew install python@3.11; then
+      log_info "Python 3 installed successfully via Homebrew"
+    else
+      log_err "Failed to install Python 3 via Homebrew"
+      PYTHON3_INSTALLED_BY_SCRIPT=0
+      return 1
+    fi
+  else
+    log_err "No supported package manager found for Python 3 installation"
+    log_err "Please install Python 3 manually and re-run with --auto-download-mods"
+    PYTHON3_INSTALLED_BY_SCRIPT=0
+    return 1
+  fi
+
+  # Verify installation
+  if command -v python3 >/dev/null 2>&1; then
+    log_info "Python 3 verification successful: $(python3 --version 2>&1)"
+    return 0
+  else
+    log_err "Python 3 installation verification failed"
+    PYTHON3_INSTALLED_BY_SCRIPT=0
+    return 1
+  fi
+}
+
+# Function: cleanup_python3_if_installed
+# Description: Removes Python 3 if it was installed by this script
+cleanup_python3_if_installed() {
+  if [ "$PYTHON3_INSTALLED_BY_SCRIPT" != "1" ]; then
+    return 0  # We didn't install it, so don't remove it
+  fi
+
+  log_info "Cleaning up Python 3 that was installed by this script..."
+  
+  if [ "$DRY_RUN" = "1" ]; then
+    log_info "[DRY-RUN] would remove Python 3"
+    return 0
+  fi
+
+  # Remove Python 3 based on package manager
+  if command -v apt-get >/dev/null 2>&1; then
+    log_info "Removing Python 3 via apt..."
+    if sudo apt-get remove -y python3 python3-minimal && sudo apt-get autoremove -y; then
+      log_info "Python 3 removed successfully via apt"
+    else
+      log_warn "Failed to remove Python 3 via apt (may need manual cleanup)"
+    fi
+  elif command -v dnf >/dev/null 2>&1; then
+    log_info "Removing Python 3 via dnf..."
+    if sudo dnf remove -y python3; then
+      log_info "Python 3 removed successfully via dnf"
+    else
+      log_warn "Failed to remove Python 3 via dnf (may need manual cleanup)"
+    fi
+  elif command -v yum >/dev/null 2>&1; then
+    log_info "Removing Python 3 via yum..."
+    if sudo yum remove -y python3; then
+      log_info "Python 3 removed successfully via yum"
+    else
+      log_warn "Failed to remove Python 3 via yum (may need manual cleanup)"
+    fi
+  elif command -v pacman >/dev/null 2>&1; then
+    log_info "Removing Python 3 via pacman..."
+    if sudo pacman -R --noconfirm python; then
+      log_info "Python 3 removed successfully via pacman"
+    else
+      log_warn "Failed to remove Python 3 via pacman (may need manual cleanup)"
+    fi
+  elif command -v zypper >/dev/null 2>&1; then
+    log_info "Removing Python 3 via zypper..."
+    if sudo zypper remove -y python3; then
+      log_info "Python 3 removed successfully via zypper"
+    else
+      log_warn "Failed to remove Python 3 via zypper (may need manual cleanup)"
+    fi
+  elif command -v brew >/dev/null 2>&1; then
+    log_info "Removing Python 3 via Homebrew..."
+    if brew uninstall python@3.11; then
+      log_info "Python 3 removed successfully via Homebrew"
+    else
+      log_warn "Failed to remove Python 3 via Homebrew (may need manual cleanup)"
+    fi
+  fi
+  
+  PYTHON3_INSTALLED_BY_SCRIPT=0
+}
+
 # Detect system memory and return appropriate JVM args (configurable percent of system RAM)
 parse_ram_size() {
   # Validate and parse RAM size string (e.g. 6G, 8192M)
@@ -1069,6 +1239,10 @@ EOF
       fi
     fi
   fi
+  
+  # Cleanup Python 3 if we installed it (server pack path)
+  cleanup_python3_if_installed
+  
   exit 0
 fi
 
@@ -1252,6 +1426,82 @@ if [ ! "$(ls -A ./mods/)" ]; then
   find "$WORK" -name "*.jar" -type f
 fi
 
+# Automatic mod download (optional)
+if [ "$AUTO_DOWNLOAD_MODS" = 1 ] && [ -n "$HAS_MANIFEST" ]; then
+  log_info "[4.5/7] Attempting automatic mod download..."
+  
+  # Check if Python 3 is available or install it
+  if command -v python3 >/dev/null 2>&1 || install_python3_if_needed; then
+    # Check if our downloader script exists
+    DOWNLOADER_SCRIPT="$(dirname "$0")/tools/cf_downloader.py"
+    if [ -f "$DOWNLOADER_SCRIPT" ]; then
+      log_info "Starting automatic mod download with cf_downloader.py"
+      log_info "This uses unofficial CurseForge endpoints and may take some time..."
+      
+      # Count mods before download
+      MODS_BEFORE=$(find ./mods -name "*.jar" -type f | wc -l)
+      
+      # Run the downloader (capture output and exit code)
+      DOWNLOAD_OUTPUT=""
+      DOWNLOAD_SUCCESS=0
+      
+      if [ "$DRY_RUN" = 1 ]; then
+        log_info "[DRY-RUN] would run: python3 $DOWNLOADER_SCRIPT $HAS_MANIFEST ./mods"
+      else
+        # Run with timeout to prevent hanging
+        if timeout 1800 python3 "$DOWNLOADER_SCRIPT" "$HAS_MANIFEST" "./mods" 2>&1; then
+          DOWNLOAD_SUCCESS=1
+        else
+          DOWNLOAD_EXIT_CODE=$?
+          case $DOWNLOAD_EXIT_CODE in
+            124) log_warn "Mod download timed out after 30 minutes" ;;
+            1) log_warn "Some mods failed to download (partial success)" ;;
+            2) log_warn "Manifest parsing failed" ;;
+            3) log_warn "Fatal error in downloader" ;;
+            130) log_warn "Mod download interrupted by user" ;;
+            *) log_warn "Mod download failed with exit code $DOWNLOAD_EXIT_CODE" ;;
+          esac
+        fi
+      fi
+      
+      # Count mods after download
+      MODS_AFTER=$(find ./mods -name "*.jar" -type f | wc -l)
+      MODS_DOWNLOADED=$((MODS_AFTER - MODS_BEFORE))
+      
+      if [ "$MODS_DOWNLOADED" -gt 0 ]; then
+        log_info "✅ Successfully downloaded $MODS_DOWNLOADED additional mod(s)"
+      else
+        log_warn "⚠️  No additional mods were downloaded"
+      fi
+      
+      # Check for missing mods log
+      if [ -f "logs/missing-mods.txt" ]; then
+        MISSING_COUNT=$(grep -c "^ProjectID:" "logs/missing-mods.txt" 2>/dev/null || echo "0")
+        if [ "$MISSING_COUNT" -gt 0 ]; then
+          log_warn "⚠️  $MISSING_COUNT mod(s) failed to download automatically"
+          log_warn "    Check logs/missing-mods.txt for manual download links"
+        fi
+      fi
+      
+    else
+      log_warn "cf_downloader.py not found at $DOWNLOADER_SCRIPT"
+      log_warn "Automatic mod download is not available - falling back to manual installation"
+    fi
+    
+    # Cleanup Python 3 if we installed it
+    cleanup_python3_if_installed
+  else
+    log_err "Failed to install or find Python 3 for automatic mod download"
+    log_warn "Falling back to manual mod installation"
+  fi
+  
+  log_info "Continuing with normal installation process..."
+else
+  if [ "$AUTO_DOWNLOAD_MODS" = 1 ] && [ -z "$HAS_MANIFEST" ]; then
+    log_warn "--auto-download-mods specified but no manifest.json found"
+  fi
+fi
+
 log_info "[5/7] EULA"
 # Interactive EULA acceptance: when run in a terminal ask the user; otherwise keep previous behavior (auto-accept)
 if [ -n "$EULA_VALUE" ]; then
@@ -1428,4 +1678,8 @@ fi
 chmod +x start.sh
 
 run rm -rf "$WORK" _fabric.json 2>/dev/null || true
+
+# Final cleanup of Python 3 if we installed it
+cleanup_python3_if_installed
+
 log_info "Install complete. Edit server.properties, then run: ./start.sh"

@@ -125,16 +125,16 @@ Akzeptanzkriterien:
 
 Ziel: Mods aus `manifest.json` optional automatisiert herunterladen.
 
-- [ ] Python-Helfer `tools/cf_downloader.py`:
+- [x] Python-Helfer `tools/cf_downloader.py`:
   - Liest `manifest.json` (Client-Export) und iteriert über `(projectID, fileID)`.
   - Versucht direkten Download unter
     `https://www.curseforge.com/api/v1/mods/{projectID}/files/{fileID}/download`.
   - Optional: Metadaten via `https://api.cfwidget.com/{projectID}` fürs Logging.
-  - Fallback bei 404 auf „neuste kompatible Version“ (heuristisch, mit deutlichem Log-Hinweis).
+  - Fallback bei 404 auf „neuste kompatible Version" (heuristisch, mit deutlichem Log-Hinweis).
   - Fehlerbehandlung inkl. Backoff, Skip-/Resume-Liste.
-- [ ] Integration per Flag `--auto-download-mods` (nur wenn `manifest.json` vorhanden).
-- [ ] Ziel `./mods/`; fehlgeschlagene Downloads landen in `logs/missing-mods.txt`.
-- [ ] Fehler einzelner Mods brechen den Gesamtlauf nicht ab.
+- [x] Integration per Flag `--auto-download-mods` (nur wenn `manifest.json` vorhanden).
+- [x] Ziel `./mods/`; fehlgeschlagene Downloads landen in `logs/missing-mods.txt`.
+- [x] Fehler einzelner Mods brechen den Gesamtlauf nicht ab.
 
 Akzeptanzkriterien:
 - Für typische Client-Exports werden die meisten Mods automatisch nach `mods/` geladen.
@@ -142,6 +142,16 @@ Akzeptanzkriterien:
 
 Hinweis:
 - Es werden bewusst inoffizielle, öffentlich erreichbare Endpunkte genutzt. Diese können sich ändern oder Ratenbegrenzungen haben; das Feature bleibt optional und dokumentiert.
+
+**Implementierungsdetails:**
+- Separates Python-Skript `tools/cf_downloader.py` mit minimaler Abhängigkeit (nur Python 3 Standard Library)
+- **Automatische Python 3 Installation**: Script installiert Python 3 automatisch falls nicht vorhanden und entfernt es nach Abschluss
+- **Cleanup-Mechanismus**: Exit-Trap sorgt für Aufräumen von Python 3 auch bei unerwarteten Skript-Abbrüchen
+- **Multi-Plattform Support**: Unterstützt apt, dnf, yum, pacman, zypper, und Homebrew für Python 3 Installation
+- Graceful Fallback: Bei Fehlern (Python 3 Installation fehlschlägt, Skript nicht gefunden, Download-Fehler) wird der normale Installationspfad fortgesetzt
+- Comprehensive Logging und Fehlerbehandlung mit detailliertem Reporting in `logs/missing-mods.txt`
+- Rate Limiting und Retry-Logik für Stabilität
+- Timeout-Schutz (30 Minuten) um hängende Downloads zu vermeiden
 
 ---
 
