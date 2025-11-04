@@ -98,13 +98,13 @@ source lib/validation.sh
 2. `lib/server.sh` erstellen
 3. **Zeilen-Reduktion: weitere ~600 Zeilen**
 
-### **Phase 3: Config & System Integration** (2-3h)
+### **[x]Phase 3: Config & System Integration** (2-3h)
 1. `lib/config.sh` erstellen
 2. `lib/system.sh` erstellen
 3. `tools/config_manager.py` für komplexes Config-Handling
 4. **Zeilen-Reduktion: weitere ~500 Zeilen**
 
-### **Phase 4: Python Migration für komplexe Tasks** (3-4h)
+### **[x]Phase 4: Python Migration für komplexe Tasks** (3-4h)
 1. `tools/download_manager.py` für robuste Downloads
 2. Network operations nach Python verlagern
 3. **Zeilen-Reduktion: weitere ~300 Zeilen**

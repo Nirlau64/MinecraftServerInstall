@@ -40,6 +40,11 @@ source "$SCRIPT_DIR/lib/server.sh"
 source "$SCRIPT_DIR/lib/config.sh"
 source "$SCRIPT_DIR/lib/system.sh"
 
+# Load enhanced download capabilities
+if [[ -f "$SCRIPT_DIR/tools/download_wrapper.sh" ]]; then
+    source "$SCRIPT_DIR/tools/download_wrapper.sh"
+fi
+
 # Trap to ensure Python 3 cleanup on exit
 cleanup_on_exit() {
   local exit_code=$?

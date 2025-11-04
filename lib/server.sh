@@ -11,6 +11,34 @@
 # - Memory management for server startup
 ################################################################################
 
+# Load download wrapper functions
+TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../tools" && pwd)"
+if [[ -f "$TOOLS_DIR/download_wrapper.sh" ]]; then
+    source "$TOOLS_DIR/download_wrapper.sh"
+fi
+
+# Enhanced download function with Python fallback
+# Usage: enhanced_download <url> <output_file> [checksum] [algorithm]
+enhanced_download() {
+    local url="$1"
+    local output="$2"
+    local checksum="$3"
+    local algorithm="${4:-sha256}"
+    
+    # Try the download wrapper function if available
+    if declare -f enhanced_curl >/dev/null 2>&1; then
+        if [[ -n "$checksum" ]]; then
+            enhanced_curl "$url" "$output" "--verify-$algorithm" "$checksum"
+        else
+            enhanced_curl "$url" "$output"
+        fi
+    else
+        # Fallback to basic curl
+        log_debug "Download wrapper not available, using basic curl"
+        curl -fL "$url" -o "$output"
+    fi
+}
+
 # Ensure this module is not executed directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   echo "This is a library module and should not be executed directly."
@@ -144,9 +172,18 @@ download_forge() {
   local mc="$1" forge="$2"
   local base="https://maven.minecraftforge.net/net/minecraftforge/forge/${mc}-${forge}"
   local inst="forge-${mc}-${forge}-installer.jar"
+  local url="${base}/${inst}"
   
   log_info "Downloading Forge installer: $inst"
-  run curl -fL "${base}/${inst}" -o "$inst"
+  
+  # Try enhanced download manager first, fallback to curl
+  if ! enhanced_download "$url" "$inst"; then
+    log_warn "Enhanced download failed, trying curl fallback..."
+    run curl -fL "$url" -o "$inst" || {
+      log_error "Failed to download Forge installer"
+      return 1
+    }
+  fi
   
   log_info "Installing Forge server..."
   run java -jar "$inst" --installServer
@@ -162,9 +199,18 @@ download_neoforge() {
   local ver="$1"
   local base="https://maven.neoforged.net/releases/net/neoforged/forge/${ver}"
   local inst="forge-${ver}-installer.jar"
+  local url="${base}/${inst}"
   
   log_info "Downloading NeoForge installer: $inst"
-  run curl -fL "${base}/${inst}" -o "$inst"
+  
+  # Try enhanced download manager first, fallback to curl
+  if ! enhanced_download "$url" "$inst"; then
+    log_warn "Enhanced download failed, trying curl fallback..."
+    run curl -fL "$url" -o "$inst" || {
+      log_error "Failed to download NeoForge installer"
+      return 1
+    }
+  fi
   
   log_info "Installing NeoForge server..."
   run java -jar "$inst" --installServer
@@ -179,15 +225,37 @@ download_neoforge() {
 download_fabric() {
   local mc_ver="$1"
   local INST="fabric-installer.jar"
+  local metadata_url="https://meta.fabricmc.net/v2/versions/installer"
   
   log_info "Fetching Fabric installer metadata..."
-  run curl -fL "https://meta.fabricmc.net/v2/versions/installer" -o _fabric.json
+  
+  # Download metadata with enhanced downloader
+  if ! enhanced_download "$metadata_url" "_fabric.json"; then
+    log_warn "Enhanced download failed for metadata, trying curl fallback..."
+    run curl -fL "$metadata_url" -o "_fabric.json" || {
+      log_error "Failed to fetch Fabric metadata"
+      return 1
+    }
+  fi
   
   local URL
   URL=$(jq -r '[.[] | select(.stable==true)][0].url' _fabric.json)
   
+  if [[ -z "$URL" || "$URL" == "null" ]]; then
+    log_error "Failed to parse Fabric installer URL from metadata"
+    return 1
+  fi
+  
   log_info "Downloading Fabric installer..."
-  run curl -fL "$URL" -o "$INST"
+  
+  # Download installer with enhanced downloader
+  if ! enhanced_download "$URL" "$INST"; then
+    log_warn "Enhanced download failed for installer, trying curl fallback..."
+    run curl -fL "$URL" -o "$INST" || {
+      log_error "Failed to download Fabric installer"
+      return 1
+    }
+  fi
   
   log_info "Installing Fabric server for MC $mc_ver..."
   run java -jar "$INST" server -mc-version "$mc_ver" -downloadMinecraft
