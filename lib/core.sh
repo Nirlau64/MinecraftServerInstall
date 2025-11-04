@@ -89,6 +89,86 @@ safe_exit() {
 }
 
 # -----------------------------------------------------------------------------
+# DRY RUN UTILITIES
+# -----------------------------------------------------------------------------
+
+# Function: dry_run
+# Description: Execute command if not in dry-run mode, otherwise log it
+# Parameters: $* - command to execute
+dry_run() {
+  if [ "${DRY_RUN:-0}" = "1" ]; then
+    log_info "[DRY-RUN] $*"
+    return 0
+  else
+    "$@"
+  fi
+}
+
+# Function: dry_run_write
+# Description: Write to file if not in dry-run mode, otherwise log it
+# Parameters: $1 - file path, $2.. - content
+dry_run_write() {
+  local path="$1"; shift
+  if [ "${DRY_RUN:-0}" = "1" ]; then
+    log_info "[DRY-RUN] write to $path"
+    return 0
+  else
+    printf '%s' "$*" > "$path"
+  fi
+}
+
+# Function: dry_run_append
+# Description: Append to file if not in dry-run mode, otherwise log it
+# Parameters: $1 - file path, $2.. - content
+dry_run_append() {
+  local path="$1"; shift
+  if [ "${DRY_RUN:-0}" = "1" ]; then
+    log_info "[DRY-RUN] append to $path"
+    return 0
+  else
+    printf '%s' "$*" >> "$path"
+  fi
+}
+
+# -----------------------------------------------------------------------------
+# USER INTERACTION UTILITIES
+# -----------------------------------------------------------------------------
+
+# Function: ask_yes_no
+# Description: Prompt user for yes/no confirmation with defaults and unattended support
+# Parameters: $1 - prompt message, $2 - default answer ('yes' or 'no')
+# Returns: 0 for yes, 1 for no
+ask_yes_no() {
+  local prompt="${1:-Proceed?}"
+  local default="${2:-no}"
+  
+  # Respect unattended flags first
+  if [ "${ASSUME_YES:-0}" = "1" ]; then return 0; fi
+  if [ "${ASSUME_NO:-0}" = "1" ]; then return 1; fi
+  
+  if [ -t 0 ]; then
+    # Interactive mode: prompt user
+    while true; do
+      read -r -p "$prompt [y/N]: " ans
+      case "$ans" in
+        y|Y|yes|YES|j|J|ja|JA) return 0 ;;
+        n|N|no|NO|nein|NEIN) return 1 ;;
+        "")
+          if [ "$default" = "yes" ]; then return 0; else return 1; fi ;;
+        *) echo "Please answer with y or n.";;
+      esac
+    done
+  else
+    # Non-interactive mode: use default value
+    if [ "$default" = "yes" ]; then
+      return 0
+    else
+      return 1
+    fi
+  fi
+}
+
+# -----------------------------------------------------------------------------
 # CROSS-PLATFORM COMPATIBILITY
 # -----------------------------------------------------------------------------
 
@@ -146,6 +226,10 @@ export -f cleanup_temp_files
 export -f safe_exit
 export -f detect_os
 export -f get_available_space_mb
+export -f dry_run
+export -f dry_run_write
+export -f dry_run_append
+export -f ask_yes_no
 
 # Set core variables
 readonly DETECTED_OS="$(detect_os)"

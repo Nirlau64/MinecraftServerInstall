@@ -90,6 +90,20 @@ detect_server_jar() {
 get_memory_args() {
   local mem_kb mem_mb mem_target
   
+  # Check for explicit RAM override first
+  if [ -n "${RAM_SIZE:-}" ]; then
+    # Try to parse RAM_SIZE (should be moved to parse_ram_size function if not already available)
+    if [[ "$RAM_SIZE" =~ ^([0-9]+)([GMgm]?)$ ]]; then
+      local size="${BASH_REMATCH[1]}"
+      local unit="${BASH_REMATCH[2],,}"  # lowercase
+      case "$unit" in
+        g|"") echo "-Xms${size}G -Xmx${size}G"; return 0 ;;
+        m) echo "-Xms${size}M -Xmx${size}M"; return 0 ;;
+      esac
+    fi
+    log_warn "Invalid RAM size: $RAM_SIZE. Falling back to dynamic allocation."
+  fi
+  
   # Memory configuration constants
   local MEMORY_PERCENT="${MEMORY_PERCENT:-75}"
   local MIN_MEMORY_MB="${MIN_MEMORY_MB:-4096}"
@@ -139,7 +153,7 @@ start_periodic_backups() {
   
   (
     while true; do
-      ts="$(date '+%Y%m%d-%H%M%S')"
+      ts="$(get_file_timestamp)"
       backup_zip="$backup_dir/${world_name}-$ts.zip"
       if [ -d "$world_name" ]; then
         zip -rq "$backup_zip" "$world_name"
@@ -379,34 +393,6 @@ get_memory_args() {
   [ "$mem_target" -gt "$MAX_MEMORY_MB" ] && mem_target="$MAX_MEMORY_MB"
   echo "-Xms${mem_target}M -Xmx${mem_target}M"
 }
-
-# Periodic backup function
-start_periodic_backups() {
-  local interval="$1" retention="$2" world_name="$3"
-  local backup_dir="backups"
-  mkdir -p "$backup_dir"
-  (
-    while true; do
-      ts="$(date '+%Y%m%d-%H%M%S')"
-      backup_zip="$backup_dir/${world_name}-$ts.zip"
-      if [ -d "$world_name" ]; then
-        zip -rq "$backup_zip" "$world_name"
-        echo "[AUTO-BACKUP] Backup complete: $backup_zip"
-        # Delete oldest backups if exceeding retention
-        backups=( $(ls -1t "$backup_dir/${world_name}-"*.zip 2>/dev/null) )
-        if [ "${#backups[@]}" -gt "$retention" ]; then
-          for ((i=${retention}; i<${#backups[@]}; i++)); do
-            rm -f "${backups[$i]}"
-            echo "[AUTO-BACKUP] Deleted old backup: ${backups[$i]}"
-          done
-        fi
-      else
-        echo "[AUTO-BACKUP] World directory '$world_name' not found, skipping backup."
-      fi
-      sleep "$((interval*3600))"
-    done
-  ) &
-}
 EOF_SHARED_FUNCS
 
   log_info "Created .server_functions.sh"
@@ -537,3 +523,138 @@ get_minecraft_version() {
   # Could be extended to parse from other sources like pack metadata
   return 1
 }
+
+################################################################################
+# Function: add_dashes_to_uuid
+# Description: Convert 32-character hex UUID to dashed format
+# Parameters: 
+#   Reads UUID from stdin
+# Returns:
+#   Echoes dashed UUID format (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+################################################################################
+add_dashes_to_uuid() {
+  sed -E 's/^(.{8})(.{4})(.{4})(.{4})(.{12})$/\1-\2-\3-\4-\5/'
+}
+
+################################################################################
+# Function: op_user
+# Description: Add a user to ops.json with Mojang API lookup
+# Parameters:
+#   $1 - username: Minecraft username to add as operator
+# Uses:
+#   OP_LEVEL environment variable (default operator level)
+#   DRY_RUN for testing
+# Dependencies:
+#   Requires curl and jq commands
+################################################################################
+op_user() {
+  local username="$1"
+  [ -n "$username" ] || return 0
+  
+  # Ensure required commands are available
+  if ! is_command_available curl || ! is_command_available jq; then
+    log_warn "curl and jq are required for OP management. Skipping user '$username'."
+    return 0
+  fi
+
+  local profile uuid_raw dashed tmp
+  local op_level="${OP_LEVEL:-4}"
+  
+  log_info "Attempting to OP user: $username (level $op_level)"
+  
+  # Query Mojang API for user profile
+  if ! profile=$(curl -fsSL "https://api.mojang.com/users/profiles/minecraft/${username}" 2>/dev/null || true); then
+    log_warn "Could not query Mojang API for user '$username'. Skipping."
+    return 0
+  fi
+  
+  # Extract UUID from profile
+  uuid_raw=$(printf '%s' "$profile" | jq -r '.id // empty' 2>/dev/null || true)
+  if [ -z "$uuid_raw" ] || ! printf '%s' "$uuid_raw" | grep -Eq '^[0-9a-fA-F]{32}$'; then
+    log_warn "Username '$username' not found or invalid UUID. Skipping."
+    return 0
+  fi
+  
+  # Convert to dashed UUID format
+  dashed=$(printf '%s' "$uuid_raw" | add_dashes_to_uuid)
+
+  # Ensure ops.json exists and is valid
+  if [ ! -f ops.json ] || ! jq -e . ops.json >/dev/null 2>&1; then
+    if [ "${DRY_RUN:-0}" = "1" ]; then
+      log_info "[DRY-RUN] create ops.json with []"
+    else
+      printf '[]' > ops.json
+    fi
+  fi
+
+  # Check if user already exists
+  if jq -e --arg u "$dashed" '.[] | select(.uuid==$u)' ops.json >/dev/null 2>&1; then
+    log_info "User '$username' already present in ops.json"
+    return 0
+  fi
+
+  # Add user to ops.json
+  if [ "${DRY_RUN:-0}" = "1" ]; then
+    log_info "[DRY-RUN] would add '$username' (uuid $dashed) to ops.json with level $op_level"
+  else
+    tmp=$(mktemp)
+    if jq --arg name "$username" --arg uuid "$dashed" --argjson level "$op_level" \
+          '. + [{"uuid": $uuid, "name": $name, "level": ($level|tonumber), "bypassesPlayerLimit": true}]' \
+          ops.json > "$tmp" 2>/dev/null; then
+      mv "$tmp" ops.json
+      log_info "Added '$username' to ops.json"
+    else
+      rm -f "$tmp" 2>/dev/null || true
+      log_warn "Failed to update ops.json"
+    fi
+  fi
+}
+
+################################################################################
+# Function: op_user_if_configured
+# Description: Add configured users as operators
+# Uses:
+#   ALWAYS_OP_USERS environment variable (space-separated list)
+#   OP_USERNAME environment variable (single user)
+################################################################################
+op_user_if_configured() {
+  # Always OP default users
+  local name
+  for name in ${ALWAYS_OP_USERS:-}; do
+    [ -n "$name" ] && op_user "$name"
+  done
+
+  # OP the specified username if set and not already in ALWAYS_OP_USERS
+  if [ -n "${OP_USERNAME:-}" ]; then
+    case " ${ALWAYS_OP_USERS:-} " in
+      *" $OP_USERNAME "*) 
+        log_debug "User '$OP_USERNAME' already processed in ALWAYS_OP_USERS"
+        ;;
+      *) 
+        op_user "$OP_USERNAME" 
+        ;;
+    esac
+  else
+    log_debug "OP_USERNAME not set; only ALWAYS_OP_USERS processed."
+  fi
+}
+
+# -----------------------------------------------------------------------------
+# MODULE INITIALIZATION
+# -----------------------------------------------------------------------------
+
+# Export server management functions
+export -f enhanced_download
+export -f detect_server_jar
+export -f setup_modloader
+export -f download_forge
+export -f download_neoforge 
+export -f download_fabric
+export -f get_memory_args
+export -f create_server_functions_file
+export -f create_start_script
+export -f download_vanilla_server
+export -f get_minecraft_version
+export -f add_dashes_to_uuid
+export -f op_user
+export -f op_user_if_configured

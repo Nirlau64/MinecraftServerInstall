@@ -39,6 +39,7 @@ source "$SCRIPT_DIR/lib/java.sh"
 source "$SCRIPT_DIR/lib/server.sh"
 source "$SCRIPT_DIR/lib/config.sh"
 source "$SCRIPT_DIR/lib/system.sh"
+source "$SCRIPT_DIR/lib/backup.sh"
 
 # Load enhanced download capabilities
 if [[ -f "$SCRIPT_DIR/tools/download_wrapper.sh" ]]; then
@@ -195,51 +196,7 @@ if [[ -z "$LOG_FILE" ]]; then
 fi
 
 # -----------------------------------------------------------------------------
-# Utility helpers
-# Backup world function: compress world/<name> to backups/<name>-YYYYmmdd-HHMMSS.zip
-backup_world() {
-  local name="${WORLD_NAME:-world}"
-  local src="$name"
-  [ -d "$src" ] || src="world"
-  local ts="$(date '+%Y%m%d-%H%M%S')"
-  local backup_dir="backups"
-  local backup_zip="$backup_dir/${name}-$ts.zip"
-  mkdir -p "$backup_dir"
-  if [ -d "$src" ]; then
-    log_info "Backing up world '$src' to $backup_zip"
-    zip -rq "$backup_zip" "$src"
-    log_info "Backup complete: $backup_zip"
-  else
-    log_warn "World directory '$src' not found, skipping backup."
-  fi
-}
-
-# Restore world function: extract zip to world/<name> (with confirmation)
-restore_world() {
-  local zip="$RESTORE_ZIP"
-  if [ ! -f "$zip" ]; then
-    log_err "Restore zip not found: $zip"
-    log_err "Please check the file path and try again."
-    exit $EXIT_PREREQ
-  fi
-  local name="${WORLD_NAME:-world}"
-  local target="$name"
-  if [ -d "$target" ]; then
-    if [ "$FORCE" = "1" ]; then
-      log_warn "Overwriting existing world '$target' due to --force."
-      rm -rf "$target"
-    else
-      if ! ask_yes_no "World '$target' exists. Overwrite with backup?" "no"; then
-        log_warn "Restore cancelled by user."
-        return 1
-      fi
-      rm -rf "$target"
-    fi
-  fi
-  log_info "Restoring world from $zip to $target"
-  unzip -q "$zip" -d .
-  log_info "Restore complete."
-}
+# Utility functions now provided by lib/backup.sh
 # -----------------------------------------------------------------------------
 
 # Returns 0 if argument is a truthy value (yes, true, 1, etc.), else 1
@@ -251,64 +208,12 @@ truthy() {
 }
 
 
-# Runs a command, or logs it if DRY_RUN is enabled
-run() {
-  if [ "$DRY_RUN" = "1" ]; then
-    log_info "[DRY-RUN] $*"
-  else
-    "$@"
-  fi
-}
+# Legacy aliases for backward compatibility - use dry_run, dry_run_write, dry_run_append from lib/core.sh
+run() { dry_run "$@"; }
+write_file() { dry_run_write "$@"; }
+append_file() { dry_run_append "$@"; }
 
-
-# Writes content to a file, or logs if DRY_RUN is enabled
-write_file() {
-  local path="$1"; shift
-  if [ "$DRY_RUN" = "1" ]; then
-    log_info "[DRY-RUN] write to $path"
-  else
-    printf '%s' "$*" > "$path"
-  fi
-}
-
-
-# Appends content to a file, or logs if DRY_RUN is enabled
-append_file() {
-  local path="$1"; shift
-  if [ "$DRY_RUN" = "1" ]; then
-    log_info "[DRY-RUN] append to $path"
-  else
-    printf '%s' "$*" >> "$path"
-  fi
-}
-
-# Periodic backup function (runs in background)
-start_periodic_backups() {
-  local interval="$1" retention="$2" world_name="${WORLD_NAME:-world}"
-  local backup_dir="backups"
-  mkdir -p "$backup_dir"
-  (
-    while true; do
-      ts="$(date '+%Y%m%d-%H%M%S')"
-      backup_zip="$backup_dir/${world_name}-$ts.zip"
-      if [ -d "$world_name" ]; then
-        zip -rq "$backup_zip" "$world_name"
-        log_info "[AUTO-BACKUP] Backup complete: $backup_zip"
-        # Delete oldest backups if exceeding retention
-        backups=( $(ls -1t "$backup_dir/${world_name}-"*.zip 2>/dev/null) )
-        if [ "${#backups[@]}" -gt "$retention" ]; then
-          for ((i=${retention}; i<${#backups[@]}; i++)); do
-            rm -f "${backups[$i]}"
-            log_info "[AUTO-BACKUP] Deleted old backup: ${backups[$i]}"
-          done
-        fi
-      else
-        log_warn "[AUTO-BACKUP] World directory '$world_name' not found, skipping backup."
-      fi
-      sleep "$((interval*3600))"
-    done
-  ) &
-}
+# start_periodic_backups() is now provided by lib/backup.sh
 
 
 
@@ -507,33 +412,7 @@ run mkdir -p "$WORK"
 #   0 - Benutzer hat "Ja" gewählt oder default ist "yes"
 #   1 - Benutzer hat "Nein" gewählt oder default ist "no"
 ################################################################################
-ask_yes_no() {
-  local prompt="${1:-Proceed?}"
-  local default="${2:-no}"
-  # Respect unattended flags first
-  if [ "$ASSUME_YES" = 1 ]; then return 0; fi
-  if [ "$ASSUME_NO" = 1 ]; then return 1; fi
-  if [ -t 0 ]; then
-    # Interaktiver Modus: Frage den Benutzer
-    while true; do
-      read -r -p "$prompt [y/N]: " ans
-      case "$ans" in
-        y|Y|yes|YES|j|J|ja|JA) return 0 ;;
-        n|N|no|NO|nein|NEIN) return 1 ;;
-        "")
-          if [ "$default" = "yes" ]; then return 0; else return 1; fi ;;
-        *) echo "Bitte mit y oder n antworten.";;
-      esac
-    done
-  else
-    # Nicht-interaktiver Modus: Verwende Default-Wert
-    if [ "$default" = "yes" ]; then
-      return 0
-    else
-      return 1
-    fi
-  fi
-}
+# ask_yes_no() is now provided by lib/core.sh
 
 ################################################################################
 # Funktion: require_cmd
@@ -926,112 +805,9 @@ parse_ram_size() {
   return 1
 }
 
-get_memory_args() {
-  # Prefer explicit RAM override
-  if [ -n "$RAM_SIZE" ]; then
-    parse_ram_size "$RAM_SIZE" && return 0
-    log_warn "Invalid RAM size: $RAM_SIZE. Falling back to dynamic allocation."
-  fi
-  local mem_kb mem_mb mem_target
-  if [ -r /proc/meminfo ]; then
-    mem_kb=$(grep '^MemTotal:' /proc/meminfo | awk '{print $2}')
-    mem_mb=$((mem_kb / 1024))
-  elif command -v sysctl >/dev/null 2>&1; then
-    mem_mb=$(sysctl -n hw.memsize 2>/dev/null | awk '{print int($1/1024/1024)}' || echo 0)
-  elif command -v wmic >/dev/null 2>&1; then
-    mem_mb=$(wmic computersystem get totalphysicalmemory 2>/dev/null | grep -v Total | awk '{print int($1/1024/1024)}' || echo 0)
-  else
-    log_warn "Unable to detect system memory. Defaulting to 4G."
-    echo "-Xms4G -Xmx4G"
-    return 0
-  fi
-  if [ -z "$mem_mb" ] || [ "$mem_mb" -lt 1024 ]; then
-    log_warn "Detected RAM too low (<1G). Defaulting to 4G."
-    echo "-Xms4G -Xmx4G"
-    return 0
-  fi
-  mem_target=$((mem_mb * MEMORY_PERCENT / 100))
-  if [ "$mem_target" -lt "$MIN_MEMORY_MB" ]; then mem_target="$MIN_MEMORY_MB"; fi
-  if [ "$mem_target" -gt "$MAX_MEMORY_MB" ]; then mem_target="$MAX_MEMORY_MB"; fi
-  echo "-Xms${mem_target}M -Xmx${mem_target}M"
-}
+# get_memory_args() is now provided by lib/server.sh
 
-
-
-######################################
-# OP helper (optional)
-######################################
-add_dashes_to_uuid() {
-  # Turn 32-hex UUID into dashed UUID
-  sed -E 's/^(.{8})(.{4})(.{4})(.{4})(.{12})$/\1-\2-\3-\4-\5/'
-}
-
-op_user() {
-  # Add a single username to ops.json if resolvable
-  local username="$1"
-  [ -n "$username" ] || return 0
-  require_cmd curl jq
-
-  local profile uuid_raw dashed tmp
-  log_info "Attempting to OP user: $username (level $OP_LEVEL)"
-  if ! profile=$(curl -fsSL "https://api.mojang.com/users/profiles/minecraft/${username}" || true); then
-    log_warn "Could not query Mojang API for user '$username'. Skipping."
-    return 0
-  fi
-  uuid_raw=$(printf '%s' "$profile" | jq -r '.id // empty')
-  if [ -z "$uuid_raw" ] || ! printf '%s' "$uuid_raw" | grep -Eq '^[0-9a-fA-F]{32}$'; then
-    log_warn "Username '$username' not found or invalid UUID. Skipping."
-    return 0
-  fi
-  dashed=$(printf '%s' "$uuid_raw" | add_dashes_to_uuid)
-
-  # Ensure ops.json exists and is an array
-  if [ ! -f ops.json ] || ! jq -e . ops.json >/dev/null 2>&1; then
-    if [ "$DRY_RUN" = 1 ]; then
-      log_info "[DRY-RUN] create ops.json with []"
-    else
-      printf '[]' > ops.json
-    fi
-  fi
-
-  if jq -e --arg u "$dashed" '.[] | select(.uuid==$u)' ops.json >/dev/null; then
-    log_info "User '$username' already present in ops.json"
-    return 0
-  fi
-
-  if [ "$DRY_RUN" = 1 ]; then
-    log_info "[DRY-RUN] would add '$username' (uuid $dashed) to ops.json with level $OP_LEVEL"
-  else
-    tmp=$(mktemp)
-    if jq --arg name "$username" --arg uuid "$dashed" --argjson level "$OP_LEVEL" \
-          '. + [{"uuid": $uuid, "name": $name, "level": ($level|tonumber), "bypassesPlayerLimit": true}]' \
-          ops.json > "$tmp"; then
-      mv "$tmp" ops.json
-      log_info "Added '$username' to ops.json"
-    else
-      rm -f "$tmp" || true
-      log_warn "Failed to update ops.json"
-    fi
-  fi
-}
-
-op_user_if_configured() {
-  # Always OP default users, then OP_USERNAME if set
-  local name
-  for name in $ALWAYS_OP_USERS; do
-    op_user "$name"
-  done
-
-  if [ -n "$OP_USERNAME" ]; then
-    # avoid duplicate attempt if already in ALWAYS_OP_USERS
-    case " $ALWAYS_OP_USERS " in
-      *" $OP_USERNAME "*) : ;;
-      *) op_user "$OP_USERNAME" ;;
-    esac
-  else
-    log_info "OP_USERNAME not set; only ALWAYS_OP_USERS processed."
-  fi
-}
+# OP management functions are now provided by lib/server.sh
 
 # Run pre-flight checks
 run_pre_flight_checks "$ZIP"
