@@ -27,10 +27,30 @@ set -euo pipefail
 
 # Trap to ensure Python 3 cleanup on exit
 cleanup_on_exit() {
+  local exit_code=$?
+  
+  # Remove temporary work directory
+  if [ -n "${WORK:-}" ] && [ -d "$WORK" ]; then
+    log_info "Cleaning up temporary directory: $WORK"
+    rm -rf "$WORK" 2>/dev/null || true
+  fi
+  
+  # Remove temporary files
+  rm -f _fabric.json .temp_* 2>/dev/null || true
+  
+  # Clean up Python 3 if we installed it
   if [ "${PYTHON3_INSTALLED_BY_SCRIPT:-0}" = "1" ]; then
     echo "[INFO] Cleaning up Python 3 installed by script..."
     cleanup_python3_if_installed
   fi
+  
+  # Log cleanup completion
+  if [ $exit_code -ne 0 ]; then
+    log_warn "Script exited with error code $exit_code"
+    log_info "Cleanup completed. Check logs for details: ${LOG_FILE:-logs/}"
+  fi
+  
+  exit $exit_code
 }
 trap cleanup_on_exit EXIT INT TERM
 
@@ -97,6 +117,146 @@ BACKUP_RETENTION="${BACKUP_RETENTION:-12}"
 SRVDIR="${SRVDIR:-$(pwd)}"
 WORK="${WORK:-${SRVDIR}/_work}"
 
+# -----------------------------------------------------------------------------
+# EXIT CODES (Consistent error handling)
+# -----------------------------------------------------------------------------
+readonly EXIT_SUCCESS=0
+readonly EXIT_GENERAL=1
+readonly EXIT_PREREQ=2
+readonly EXIT_DOWNLOAD=3
+readonly EXIT_INSTALL=4
+readonly EXIT_EULA=5
+readonly EXIT_START=6
+
+# -----------------------------------------------------------------------------
+# PRE-FLIGHT CHECKS
+# -----------------------------------------------------------------------------
+
+# Function: check_disk_space
+# Description: Checks if there's enough free disk space (minimum 2GB recommended)
+# Returns: 0 if OK, exits with EXIT_PREREQ if insufficient space
+check_disk_space() {
+  local min_space_mb=2048
+  local available_mb
+  
+  if command -v df >/dev/null 2>&1; then
+    # Get available space in MB - try different df formats
+    if df -BM . >/dev/null 2>&1; then
+      # GNU df with block size
+      available_mb=$(df -BM . | awk 'NR==2 {gsub(/M/, "", $4); print int($4)}')
+    elif df -m . >/dev/null 2>&1; then
+      # Some systems use -m for MB
+      available_mb=$(df -m . | awk 'NR==2 {print int($4)}')
+    elif df -Pm . >/dev/null 2>&1; then
+      # POSIX-style df
+      available_mb=$(df -Pm . | awk 'NR==2 {print $4}')
+    else
+      # Fallback: assume 1K blocks and convert to MB
+      available_mb=$(df . 2>/dev/null | awk 'NR==2 {print int($4/1024)}')
+    fi
+    
+    if [ "$available_mb" -lt "$min_space_mb" ]; then
+      log_err "Insufficient disk space: ${available_mb}MB available, ${min_space_mb}MB required"
+      log_err "Please free up some disk space and try again."
+      exit $EXIT_PREREQ
+    fi
+    
+    log_info "Disk space check: ${available_mb}MB available (${min_space_mb}MB required) ✓"
+  else
+    log_warn "Cannot check disk space (df command not available)"
+  fi
+}
+
+# Function: check_zip_validity  
+# Description: Validates that the ZIP file is not corrupted
+# Parameter: $1 - path to ZIP file
+# Returns: 0 if valid, exits with EXIT_PREREQ if invalid
+check_zip_validity() {
+  local zip_file="$1"
+  
+  if [ ! -f "$zip_file" ]; then
+    log_err "Modpack file not found: $zip_file"
+    log_err "Please check the file path and try again."
+    exit $EXIT_PREREQ
+  fi
+  
+  log_info "Validating ZIP file integrity..."
+  
+  if command -v unzip >/dev/null 2>&1; then
+    if ! unzip -tq "$zip_file" >/dev/null 2>&1; then
+      log_err "ZIP file appears to be corrupted: $zip_file"
+      log_err "Please re-download the modpack and try again."
+      exit $EXIT_PREREQ
+    fi
+    log_info "ZIP file validation: OK ✓"
+  else
+    log_warn "Cannot validate ZIP file (unzip command not available)"
+  fi
+}
+
+# Function: check_port_availability
+# Description: Checks if port 25565 is already in use
+# Returns: 0 if available, warns if occupied
+check_port_availability() {
+  local port=25565
+  
+  if command -v ss >/dev/null 2>&1; then
+    if ss -ltn 2>/dev/null | grep -q ":${port}\s"; then
+      log_warn "Port $port appears to be in use by another process"
+      log_warn "The server may fail to start or you may need to change the port in server.properties"
+    else
+      log_info "Port $port availability: OK ✓"
+    fi
+  elif command -v netstat >/dev/null 2>&1; then
+    if netstat -ln 2>/dev/null | grep -q ":${port}\s"; then
+      log_warn "Port $port appears to be in use by another process"
+      log_warn "The server may fail to start or you may need to change the port in server.properties"
+    else
+      log_info "Port $port availability: OK ✓"
+    fi
+  else
+    log_warn "Cannot check port availability (ss/netstat not available)"
+  fi
+}
+
+# Function: check_existing_server
+# Description: Checks for existing Minecraft server processes
+# Returns: 0 always, but warns if server processes found
+check_existing_server() {
+  if command -v pgrep >/dev/null 2>&1; then
+    if pgrep -f "minecraft.*server|forge.*server|fabric.*server" >/dev/null 2>&1; then
+      log_warn "Existing Minecraft server process detected"
+      log_warn "You may want to stop it before installing a new server"
+    else
+      log_info "Server process check: No conflicting processes ✓"
+    fi
+  elif command -v ps >/dev/null 2>&1; then
+    if ps aux 2>/dev/null | grep -v grep | grep -q "minecraft.*server\|forge.*server\|fabric.*server"; then
+      log_warn "Existing Minecraft server process detected"
+      log_warn "You may want to stop it before installing a new server"
+    else
+      log_info "Server process check: No conflicting processes ✓"
+    fi
+  else
+    log_warn "Cannot check for existing server processes (pgrep/ps not available)"
+  fi
+}
+
+# Function: run_pre_flight_checks
+# Description: Runs all pre-flight checks
+# Parameter: $1 - ZIP file path
+run_pre_flight_checks() {
+  local zip_file="$1"
+  
+  log_info "Running pre-flight checks..."
+  
+  check_disk_space
+  check_zip_validity "$zip_file"
+  check_port_availability
+  check_existing_server
+  
+  log_info "Pre-flight checks completed ✓"
+}
 
 # -----------------------------------------------------------------------------
 # Runtime flags (populated via CLI/env)
@@ -231,7 +391,8 @@ restore_world() {
   local zip="$RESTORE_ZIP"
   if [ ! -f "$zip" ]; then
     log_err "Restore zip not found: $zip"
-    exit 1
+    log_err "Please check the file path and try again."
+    exit $EXIT_PREREQ
   fi
   local name="${WORLD_NAME:-world}"
   local target="$name"
@@ -412,11 +573,79 @@ EOF_SHARED_FUNCS
 }
 
 ######################################
+# Help and usage information
+######################################
+show_help() {
+  cat << EOF
+Universal Minecraft Server Setup Script
+
+Usage: $0 [OPTIONS] [MODPACK.zip]
+
+OPTIONS:
+  Unattended/Prompts:
+    --yes                    Answer 'yes' to all prompts
+    --assume-no              Answer 'no' to all prompts
+    --no-eula-prompt         Skip EULA prompt (use with --eula)
+    --eula=true|false        Set EULA acceptance explicitly
+    --force                  Overwrite files without asking
+    --dry-run                Show what would be done, don't make changes
+    
+  Memory:
+    --ram SIZE               Set RAM allocation (e.g. 4G, 8192M)
+    
+  Logging:
+    --verbose                Increase log verbosity
+    --quiet                  Reduce log output
+    --log-file PATH          Write logs to specific file
+    
+  Services:
+    --systemd                Generate systemd service file
+    --tmux                   Start server in tmux session
+    
+  Worlds/Backups:
+    --world NAME             Set world name (default: world)
+    --restore ZIP            Restore world from backup ZIP
+    --pre-backup             Create backup before installation
+    
+  Mods:
+    --auto-download-mods     Auto-download mods from manifest.json
+    
+  Misc:
+    --help                   Show this help message
+    
+ENVIRONMENT VARIABLES:
+    AUTO_YES=1               Same as --yes
+    EULA=true|false          Same as --eula
+    RAM=SIZE                 Same as --ram SIZE
+    
+EXAMPLES:
+    # Interactive installation
+    $0 MyModpack.zip
+    
+    # Unattended installation with 6GB RAM
+    $0 --yes --eula=true --ram 6G MyModpack.zip
+    
+    # Install and start with systemd
+    $0 --systemd --yes --eula=true MyModpack.zip
+    
+For more information, see README.md
+EOF
+}
+
+######################################
 # Argument parsing
 ######################################
 parse_args() {
   while [ $# -gt 0 ]; do
     case "$1" in
+      --help|-h)
+        show_help
+        exit $EXIT_SUCCESS
+        ;;
+      --version)
+        echo "Universal Minecraft Server Setup Script v1.0"
+        exit $EXIT_SUCCESS
+        ;;
       --systemd)
         SYSTEMD=1
         ;;
@@ -479,7 +708,9 @@ parse_args() {
         shift; break 
         ;;
       -*) 
-        log_err "Unknown option: $1"; exit 2 
+        log_err "Unknown option: $1"
+        log_err "Use --help for usage information"
+        exit $EXIT_PREREQ 
         ;;
       *)
         # Accept positional ZIP argument if not overridden
@@ -552,23 +783,105 @@ ask_yes_no() {
 
 ################################################################################
 # Funktion: require_cmd
-# Beschreibung: Prüft ob alle benötigten Befehle verfügbar sind
+# Beschreibung: Prüft ob alle benötigten Befehle verfügbar sind und gibt OS-spezifische Installationshinweise
 # Parameter:
 #   $@ - Liste der zu prüfenden Befehle
 # Rückgabe:
 #   0 - Alle Befehle sind verfügbar
-#   exit 1 - Mindestens ein Befehl fehlt
+#   exit EXIT_PREREQ - Mindestens ein Befehl fehlt
 ################################################################################
+
+# Function to get installation command for missing tools
+get_install_hint() {
+  local cmd="$1"
+  local hint=""
+  
+  # Detect package manager and provide appropriate install command
+  if command -v apt-get >/dev/null 2>&1; then
+    case "$cmd" in
+      unzip) hint="sudo apt-get install unzip" ;;
+      curl) hint="sudo apt-get install curl" ;;
+      jq) hint="sudo apt-get install jq" ;;
+      rsync) hint="sudo apt-get install rsync" ;;
+      java) hint="sudo apt-get install openjdk-17-jdk" ;;
+      *) hint="sudo apt-get install $cmd" ;;
+    esac
+  elif command -v dnf >/dev/null 2>&1; then
+    case "$cmd" in
+      unzip) hint="sudo dnf install unzip" ;;
+      curl) hint="sudo dnf install curl" ;;
+      jq) hint="sudo dnf install jq" ;;
+      rsync) hint="sudo dnf install rsync" ;;
+      java) hint="sudo dnf install java-17-openjdk-devel" ;;
+      *) hint="sudo dnf install $cmd" ;;
+    esac
+  elif command -v yum >/dev/null 2>&1; then
+    case "$cmd" in
+      unzip) hint="sudo yum install unzip" ;;
+      curl) hint="sudo yum install curl" ;;
+      jq) hint="sudo yum install jq" ;;
+      rsync) hint="sudo yum install rsync" ;;
+      java) hint="sudo yum install java-17-openjdk-devel" ;;
+      *) hint="sudo yum install $cmd" ;;
+    esac
+  elif command -v pacman >/dev/null 2>&1; then
+    case "$cmd" in
+      unzip) hint="sudo pacman -S unzip" ;;
+      curl) hint="sudo pacman -S curl" ;;
+      jq) hint="sudo pacman -S jq" ;;
+      rsync) hint="sudo pacman -S rsync" ;;
+      java) hint="sudo pacman -S jdk17-openjdk" ;;
+      *) hint="sudo pacman -S $cmd" ;;
+    esac
+  elif command -v zypper >/dev/null 2>&1; then
+    case "$cmd" in
+      unzip) hint="sudo zypper install unzip" ;;
+      curl) hint="sudo zypper install curl" ;;
+      jq) hint="sudo zypper install jq" ;;
+      rsync) hint="sudo zypper install rsync" ;;
+      java) hint="sudo zypper install java-17-openjdk-devel" ;;
+      *) hint="sudo zypper install $cmd" ;;
+    esac
+  elif command -v brew >/dev/null 2>&1; then
+    case "$cmd" in
+      unzip) hint="brew install unzip" ;;
+      curl) hint="curl is usually pre-installed on macOS" ;;
+      jq) hint="brew install jq" ;;
+      rsync) hint="rsync is usually pre-installed on macOS" ;;
+      java) hint="brew install openjdk@17" ;;
+      *) hint="brew install $cmd" ;;
+    esac
+  else
+    hint="Please install $cmd using your system's package manager"
+  fi
+  
+  printf '%s' "$hint"
+}
+
 require_cmd() {
   local missing=0
+  local missing_cmds=()
+  
   for c in "$@"; do
     if ! command -v "$c" >/dev/null 2>&1; then
-      echo "FEHLER: Benötigter Befehl nicht gefunden: $c" >&2
-      echo "Bitte installieren Sie $c und versuchen Sie es erneut." >&2
+      missing_cmds+=("$c")
       missing=1
     fi
   done
-  [ $missing -eq 0 ] || exit 1
+  
+  if [ $missing -eq 1 ]; then
+    log_err "Missing required commands: ${missing_cmds[*]}"
+    echo ""
+    log_err "Installation hints:"
+    for c in "${missing_cmds[@]}"; do
+      local hint
+      hint=$(get_install_hint "$c")
+      log_err "  For $c: $hint"
+    done
+    echo ""
+    log_err "Please install the missing commands and try again."
+    exit $EXIT_PREREQ
+  fi
 }
 
 ################################################################################
@@ -669,13 +982,15 @@ setup_java() {
     fi
   else
     log_err "Could not detect package manager. Please install Java $java_ver manually."
-    exit 1
+    log_err "Visit https://adoptium.net/ for installation instructions."
+    exit $EXIT_INSTALL
   fi
 
   # Verifiziere dass Java nach der Installation verfügbar ist
   if ! command -v java >/dev/null 2>&1; then
     log_err "Java installation failed. Please install Java $java_ver manually."
-    exit 1
+    log_err "Visit https://adoptium.net/ for installation instructions."
+    exit $EXIT_INSTALL
   fi
 
   # Prüfe installierte Java-Version
@@ -696,10 +1011,11 @@ setup_java() {
     log_err "Java version mismatch after installation."
     log_err "Expected Java $java_ver but found Java $installed_ver"
     log_err "Current alternatives setting:"
-    update-alternatives --display java >&2
+    update-alternatives --display java >&2 || true
     log_err "Available Java installations:"
-    ls -l /usr/lib/jvm/java-* >&2
-    exit 1
+    ls -l /usr/lib/jvm/java-* 2>&1 || true
+    log_err "You may need to set JAVA_HOME or update-alternatives manually."
+    exit $EXIT_INSTALL
   fi
 
   log_info "Successfully installed Java $java_ver"
@@ -1021,10 +1337,8 @@ op_user_if_configured() {
   fi
 }
 
-if [ ! -f "$ZIP" ]; then
-  log_err "Zip not found: $ZIP"
-  exit 1
-fi
+# Run pre-flight checks
+run_pre_flight_checks "$ZIP"
 
 log_info "[1/7] Unzipping pack..."
 require_cmd unzip curl jq rsync
@@ -1250,9 +1564,10 @@ fi
 # PATH 2: Client Export Conversion
 ################################################################################
 if [ -z "$HAS_MANIFEST" ]; then
-  echo "FEHLER: Weder Server-Dateien noch manifest.json gefunden." >&2
-  echo "Bitte stellen Sie sicher, dass Sie ein gültiges Modpack-ZIP verwenden." >&2
-  exit 1
+  log_err "Neither server files nor manifest.json found in ZIP."
+  log_err "Please ensure you're using a valid modpack ZIP file."
+  log_err "Supported formats: CurseForge modpack exports or server packs with start scripts."
+  exit $EXIT_PREREQ
 fi
 
 log_info "[2/7] Client export detected. Parsing manifest.json..."
@@ -1261,8 +1576,9 @@ MAN="$HAS_MANIFEST"
 # Parse Manifest-Daten
 MC_VER=$(jq -r '.minecraft.version' "$MAN" 2>/dev/null)
 if [ -z "$MC_VER" ] || [ "$MC_VER" = "null" ]; then
-  echo "FEHLER: Konnte Minecraft-Version nicht aus manifest.json lesen" >&2
-  exit 1
+  log_err "Could not read Minecraft version from manifest.json"
+  log_err "The manifest file may be corrupted or in an unsupported format."
+  exit $EXIT_PREREQ
 fi
 
 # Installiere korrekte Java-Version für diese MC-Version
@@ -1523,8 +1839,11 @@ log_info "[6/7] First run to generate files..."
 # detect server jar robustly
 SRVJAR="$(detect_server_jar)"
 if [ -z "$SRVJAR" ]; then
-  log_err "Could not detect server jar. Check the directory.";
-  exit 1
+  log_err "Could not detect server jar in the current directory."
+  log_err "Available .jar files:"
+  ls -la *.jar 2>/dev/null || log_err "  No .jar files found"
+  log_err "Please ensure the modloader installation completed successfully."
+  exit $EXIT_INSTALL
 fi
 
 # Set memory based on system RAM (configurable percent) or use provided JAVA_ARGS

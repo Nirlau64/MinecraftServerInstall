@@ -159,17 +159,53 @@ Hinweis:
 
 Ziel: Frühzeitig typische Fehler erkennen, klar kommunizieren und sauber abbrechen.
 
-- [ ] Vorab-Prüfungen:
+- [x] Vorab-Prüfungen:
   - Freier Speicherplatz im Ziel (`df -Pm .`), ggf. Warnung/Abbruch.
   - ZIP-Validität (`unzip -tq`).
   - Port-Check 25565 (`ss -ltn | grep :25565`) bzw. bestehender Serverprozess.
-- [ ] `require_cmd` erweitert um OS-spezifische Install-Hinweise bei fehlenden Tools.
-- [ ] Cleanup-Routine bei Abbruch (Workdir/Tempdateien zuverlässig entfernen).
-- [ ] Konsistente Exit-Codes (z. B. 2=Prereq, 3=Download, 4=Install, 5=EULA, 6=Start).
+- [x] `require_cmd` erweitert um OS-spezifische Install-Hinweise bei fehlenden Tools.
+- [x] Cleanup-Routine bei Abbruch (Workdir/Tempdateien zuverlässig entfernen).
+- [x] Konsistente Exit-Codes (z. B. 2=Prereq, 3=Download, 4=Install, 5=EULA, 6=Start).
 
 Akzeptanzkriterien:
 - Fehler führen zu klaren, farbigen Meldungen inkl. Ursache/Nächste Schritte; Details im Log.
 - Temporäre Artefakte werden auch bei Abbruch entfernt.
+
+**Implementiert:**
+- **Pre-flight checks**: 
+  - Disk space check (2GB minimum) with multiple df format support (GNU, POSIX, BSD)
+  - ZIP integrity validation using `unzip -tq`
+  - Port 25565 availability check using ss/netstat
+  - Existing server process detection using pgrep/ps
+- **Enhanced require_cmd**: OS-specific installation hints for missing tools supporting:
+  - apt-get (Debian/Ubuntu)
+  - dnf (Fedora/RHEL 8+)
+  - yum (CentOS/RHEL 7)
+  - pacman (Arch Linux)
+  - zypper (openSUSE/SUSE)
+  - brew (macOS/Homebrew)
+- **Robust cleanup**: Enhanced EXIT trap that:
+  - Removes temporary work directories safely
+  - Cleans up temp files (_fabric.json, .temp_*)
+  - Removes Python 3 if automatically installed by script
+  - Preserves exit codes and logs cleanup status
+- **Consistent exit codes**: 
+  - EXIT_SUCCESS(0) - Normal completion
+  - EXIT_GENERAL(1) - General errors
+  - EXIT_PREREQ(2) - Prerequisites/validation failures
+  - EXIT_DOWNLOAD(3) - Download failures
+  - EXIT_INSTALL(4) - Installation failures
+  - EXIT_EULA(5) - EULA related issues
+  - EXIT_START(6) - Server startup failures
+- **Help system**: 
+  - Added --help/-h flag with comprehensive usage examples
+  - --version flag for version information
+  - Detailed parameter documentation and environment variables
+- **Better error messages**: 
+  - Contextual error information with specific next steps
+  - OS-specific installation commands for missing dependencies
+  - Detailed logging of error conditions and suggested solutions
+  - Graceful fallbacks when system commands are unavailable
 
 ---
 
