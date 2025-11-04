@@ -1,118 +1,402 @@
 # MinecraftServerInstall
 
-This repository contains a universal Bash script for installing and configuring a Minecraft server on Linux.
-It has been tested with the **Forge** and **Fabric** mod loaders and helps convert server packs or client exports from CurseForge/Modrinth into a fully functional dedicated server.
+This repository contains a comprehensive universal Bash script for installing and configuring modded Minecraft servers on Linux.
+It supports **Forge**, **NeoForge**, **Fabric**, and **Quilt** loaders and can handle both server packs and client exports from CurseForge/Modrinth.
 
 ## Features
 
-* Sets up a Minecraft server for a specified version
-* Supports both **Forge** and **Fabric**
-* Automatically installs the correct Java version (OpenJDK)
-* Creates `eula.txt`, startup scripts, and basic server configuration
-* Detects and uses existing `mods/` and `config/` folders
-* Automatically starts the server after installation
+### Core Functionality
+* **Universal mod loader support**: Forge, NeoForge, Fabric, and Quilt
+* **Automatic Java detection**: Installs the correct Java version (8, 17, or 21) based on Minecraft version
+* **Smart pack detection**: Handles both server packs and client exports automatically
+* **Robust file handling**: Intelligent copying of mods, configs, and other assets
+* **Dynamic memory allocation**: Automatically allocates 75% of system RAM (configurable)
 
-## Quick config (edit at top of the script)
+### Advanced Features
+* **Non-interactive mode**: Full automation support for CI/CD and unattended deployments
+* **Comprehensive logging**: Timestamped logs with color output and file logging
+* **Backup system**: Automatic world backups with configurable intervals and retention
+* **Multi-world support**: Easy switching between different worlds
+* **systemd integration**: Generate service files for automatic startup and management
+* **tmux integration**: Run server in detached sessions
+* **Server properties templating**: Smart configuration management with environment variable support
+* **Operator management**: Automatic operator assignment and permission handling
 
-The setup script now has a clear CONFIG section at the top with common settings:
+## Quick Start
 
-- ZIP: path to the modpack zip to install (can still be provided as CLI arg)
-- OP_USERNAME: player name to grant operator rights to automatically (optional)
-- OP_LEVEL: operator permission level (1-4, default 4)
-- AUTO_ACCEPT_EULA: yes/no default used when no terminal is attached
-- AUTO_FIRST_RUN: yes/no default used when no terminal is attached
-- JAVA_ARGS: optional custom JVM args (else memory is sized dynamically)
-- MEMORY_PERCENT, MIN_MEMORY_MB, MAX_MEMORY_MB: control dynamic memory sizing
+```bash
+# Basic usage with a modpack
+./universalServerSetup\ -\ Working.sh MyModpack.zip
+
+# Non-interactive installation
+./universalServerSetup\ -\ Working.sh --yes --eula=true MyModpack.zip
+
+# Custom RAM allocation
+./universalServerSetup\ -\ Working.sh --ram 8G MyModpack.zip
+
+# With systemd service generation
+./universalServerSetup\ -\ Working.sh --systemd MyModpack.zip
+```
+
+## Configuration Options
+
+### Script Configuration (edit at top of script)
+
+The setup script has a comprehensive CONFIG section at the top:
+
+**Basic Settings:**
+- `ZIP`: Path to the modpack zip file (can be overridden via CLI argument)
+- `OP_USERNAME`: Minecraft username to grant operator rights automatically
+- `OP_LEVEL`: Operator permission level (1-4, default: 4)
+- `ALWAYS_OP_USERS`: Space-separated list of users to always grant OP status
+
+**Non-interactive Defaults:**
+- `AUTO_ACCEPT_EULA`: Accept EULA automatically when no terminal is available ("yes"/"no")
+- `AUTO_FIRST_RUN`: Run server automatically after setup when no terminal is available ("yes"/"no")
+
+**Memory Configuration:**
+- `JAVA_ARGS`: Custom JVM arguments (overrides automatic memory sizing)
+- `MEMORY_PERCENT`: Percentage of system RAM to allocate (default: 75%)
+- `MIN_MEMORY_MB`: Minimum RAM allocation (default: 2048MB)
+- `MAX_MEMORY_MB`: Maximum RAM allocation (default: 32768MB)
+
+**Backup Settings:**
+- `BACKUP_INTERVAL_HOURS`: Automatic backup interval (default: 4 hours)
+- `BACKUP_RETENTION`: Number of backups to keep (default: 12)
+
+**Server Properties Defaults:**
+- `PROP_MOTD`: Server message of the day
+- `PROP_DIFFICULTY`: Game difficulty (peaceful, easy, normal, hard)
+- `PROP_PVP`: Enable PvP (true/false)
+- `PROP_VIEW_DISTANCE`: Server view distance (default: 10)
+- `PROP_MAX_PLAYERS`: Maximum number of players (default: 20)
+- And many more server.properties options...
 
 ## Requirements
 
-* Linux system or VPS with enough storage and an open port `25565`
-* Installed **bash** and **curl/wget**
+* Linux system or VPS with sufficient storage and port `25565` available
+* Required tools: `bash`, `unzip`, `curl`, `jq`, `rsync`
+* `sudo` rights for Java installation (if needed)
+* Internet connection for downloads
 * Write permissions in the working directory
 
 ## Installation & Usage
 
-1. Clone this repository or download the script:
+### Basic Installation
 
+1. **Clone the repository:**
    ```bash
    git clone https://github.com/Nirlau64/MinecraftServerInstall.git
    cd MinecraftServerInstall
    ```
-2. Adjust the script (Minecraft version, RAM allocation, mod loader, etc.)
-3. Manually copy mods and configuration files into the respective folders:
 
-   * `mods/` → all `.jar` mod files
-   * `config/` → all configuration files
-
-   > These files must be copied manually because the script cannot download mods automatically due to **CurseForge API** restrictions.
-4. **Provide the Modpack ZIP:**
-   When running the script, the ZIP file of the desired modpack must be passed as an argument. Example:
-
+2. **Run with a modpack:**
    ```bash
-   ./universalServerSetup\ -\ Working.sh Modpack.zip
+   ./universalServerSetup\ -\ Working.sh MyModpack.zip
    ```
 
-   The script will automatically unpack the ZIP file, detect its structure, and configure the server accordingly.
-5. After completion, the server will start automatically.
+The script will automatically:
+- Detect if the ZIP contains a server pack or client export
+- Install the appropriate Java version for the Minecraft version
+- Download and install the correct mod loader (Forge/NeoForge/Fabric/Quilt)
+- Copy all mods, configs, and other assets
+- Generate startup scripts and configuration files
+- Optionally run the server for initial setup
 
----
+### Command Line Options
 
-## Example Directory Structure
+#### Essential Flags
+- `--yes` / `-y`: Answer "yes" to all prompts (non-interactive mode)
+- `--assume-no`: Answer "no" to all prompts
+- `--force`: Overwrite existing files without asking
+- `--dry-run`: Show what would be done without making changes
 
-### Before the First Script Execution
+#### EULA Handling
+- `--eula=true|false`: Set EULA acceptance explicitly
+- `--no-eula-prompt`: Skip EULA prompt (use with `--eula`)
 
+#### Memory Configuration
+- `--ram <SIZE>`: Set specific RAM amount (e.g., `--ram 8G`, `--ram 4096M`)
+- Environment: `JAVA_ARGS="-Xms8G -Xmx8G"`
+
+#### Logging
+- `--verbose`: Increase logging detail
+- `--quiet`: Reduce logging output
+- `--log-file <path>`: Custom log file location
+
+#### Service Integration
+- `--systemd`: Generate systemd service file
+- `--tmux`: Start server in tmux session
+
+#### World & Backup Management
+- `--world <name>`: Use specific world name
+- `--pre-backup`: Create backup before installation
+- `--restore <backup.zip>`: Restore world from backup
+
+#### Server Properties
+You can override any server property via command line:
+```bash
+--motd="My Awesome Server" --difficulty=hard --max-players=50 --pvp=false
+```
+
+### Environment Variables
+
+All configuration can be controlled via environment variables:
+
+```bash
+# Non-interactive setup
+export AUTO_ACCEPT_EULA=yes
+export AUTO_FIRST_RUN=yes
+export ASSUME_YES=1
+
+# Memory configuration
+export MEMORY_PERCENT=80
+export MIN_MEMORY_MB=4096
+export MAX_MEMORY_MB=16384
+
+# Operator settings
+export OP_USERNAME=myplayer
+export ALWAYS_OP_USERS="admin1 admin2 moderator1"
+
+# Server properties
+export PROP_DIFFICULTY=hard
+export PROP_MAX_PLAYERS=50
+export PROP_MOTD="My Server"
+
+# Run the script
+./universalServerSetup\ -\ Working.sh MyModpack.zip
+```
+
+## Usage Examples
+
+### Interactive Installation
+```bash
+# Standard interactive setup
+./universalServerSetup\ -\ Working.sh MyModpack.zip
+```
+The script will prompt for EULA acceptance and first run confirmation.
+
+### Automated/CI Installation
+```bash
+# Fully automated setup for CI/CD
+./universalServerSetup\ -\ Working.sh --yes --eula=true --force MyModpack.zip
+
+# With custom RAM and systemd service
+./universalServerSetup\ -\ Working.sh --yes --eula=true --ram 16G --systemd MyModpack.zip
+```
+
+### Development/Testing
+```bash
+# Dry run to see what would happen
+./universalServerSetup\ -\ Working.sh --dry-run MyModpack.zip
+
+# Verbose logging for troubleshooting
+./universalServerSetup\ -\ Working.sh --verbose --log-file debug.log MyModpack.zip
+```
+
+### World Management
+```bash
+# Create backup before major changes
+./universalServerSetup\ -\ Working.sh --pre-backup --world survival MyModpack.zip
+
+# Restore from backup
+./universalServerSetup\ -\ Working.sh --restore backups/survival-20241104-143022.zip
+```
+
+## Directory Structure
+
+### Before Installation
 ```
 MinecraftServerInstall/
 ├── universalServerSetup - Working.sh
-├── Modpack.zip
+├── MyModpack.zip
 ├── README.md
+└── ToDo.md
 ```
 
-*(The ZIP file typically contains the following structure:)*
-
-```
-Modpack.zip
-├── manifest.json
-├── overrides/
-│   ├── config/
-│   │   ├── ...
-│   └── mods/
-│       ├── ...
-```
-
----
-
-### After the First Script Execution
-
+### After Installation
 ```
 MinecraftServerInstall/
 ├── universalServerSetup - Working.sh
+├── start.sh                     # Generated startup script
+├── .server_functions.sh         # Shared functions
+├── .server_jar                  # Server jar name cache
 ├── eula.txt
-├── server.properties
-├── start.sh
-├── mods/
-│   ├── <all .jar files from Modpack>
-├── config/
-│   ├── <all configuration files from Modpack>
-├── libraries/
-├── logs/
-├── world/
-├── forge-1.xx.x-installer.jar   (or fabric-server-launch.jar)
-├── Modpack.zip
-└── README.md
+├── server.properties            # Generated from template
+├── ops.json                     # Generated if operators configured
+├── mods/                        # All mod files from modpack
+│   ├── mod1.jar
+│   └── mod2.jar
+├── config/                      # Configuration files
+│   ├── forge-common.toml
+│   └── mod-configs/
+├── logs/                        # Server and installation logs
+│   ├── install-20241104-143022.log
+│   └── latest.log
+├── backups/                     # Automatic world backups
+│   └── world-20241104-120000.zip
+├── world/                       # Default world (or custom name)
+├── libraries/                   # Mod loader libraries
+├── forge-xx.x.x-xx.x.x.jar    # Server jar (varies by loader)
+└── dist/                        # Optional service files
+    └── minecraft.service
 ```
 
-After the first run, all necessary server files are created, and the server can be started directly via the startup script or run in the background using a process manager (e.g., `screen` or `tmux`).
+## Generated Files
 
----
+### start.sh
+The generated startup script includes:
+- Automatic server jar detection
+- Dynamic memory allocation
+- Periodic backup system
+- Proper error handling and logging
 
-## Notes
+### .server_functions.sh
+Shared functions used by both the setup script and startup script:
+- Memory calculation logic
+- Server jar detection
+- Backup functions
+- Cross-platform compatibility helpers
 
-* The script has been successfully tested with **Forge** and **Fabric**.
-* When using the CurseForge client, the generated `mods/` and `config/` folders must be **manually** copied into the server directory.
-* Changing mods or configurations requires a server restart.
-* It is strongly recommended to create a backup before making major changes.
+### systemd Service (optional)
+When using `--systemd`, generates `dist/minecraft.service` with:
+- Proper user and working directory configuration
+- Memory settings from installation
+- Automatic restart on failure
+- Integration with system logging
+
+## Advanced Features
+
+### Automatic Backup System
+- Configurable backup intervals (default: every 4 hours)
+- Automatic retention management (default: keep 12 backups)
+- Backups are compressed ZIP files with timestamps
+- World restoration from any backup with `--restore`
+
+### Multi-World Support
+- Easy switching between different worlds via `--world <name>`
+- Automatic `server.properties` updates for world configuration
+- Backup and restore operations work with any world name
+
+### Service Integration
+- **systemd**: Generate complete service files for production deployment
+- **tmux**: Run in detached sessions with easy attachment
+- Proper signal handling and graceful shutdown support
+
+### Smart Configuration Management
+- Template-based `server.properties` generation
+- Environment variable integration for all settings
+- Preservation of manual changes during script re-runs
+- Command-line overrides for all server properties
+
+## Supported Configurations
+
+### Mod Loaders
+- ✅ **Forge** (all versions)
+- ✅ **NeoForge** (1.20.1+)
+- ✅ **Fabric** (all versions)  
+- ✅ **Quilt** (all versions)
+
+### Minecraft Versions
+- ✅ **1.7.10 - 1.16.5**: Java 8 (auto-installed)
+- ✅ **1.17 - 1.20.4**: Java 17 (auto-installed)
+- ✅ **1.20.5+**: Java 21 (auto-installed)
+
+### Pack Types
+- ✅ **Server Packs**: Direct installation with existing startup scripts
+- ✅ **Client Exports**: Automatic conversion from CurseForge/Modrinth exports
+- ✅ **Manual Setups**: Works with custom mod configurations
+
+### Operating Systems
+- ✅ **Linux** (primary target)
+- ✅ **macOS** (with Homebrew)
+- ⚠️ **Windows** (WSL recommended)
+
+## Troubleshooting
+
+### Common Issues
+
+**Java Installation Fails:**
+```bash
+# Check available Java versions
+java -version
+# Manual Java installation may be required on some systems
+```
+
+**Port 25565 Already in Use:**
+```bash
+# Check for existing Minecraft servers
+ss -tlnp | grep :25565
+# Stop existing servers before running the script
+```
+
+**Missing Dependencies:**
+```bash
+# Install required tools (Ubuntu/Debian)
+sudo apt update
+sudo apt install unzip curl jq rsync
+
+# Install required tools (CentOS/RHEL)
+sudo yum install unzip curl jq rsync
+```
+
+**Permission Issues:**
+```bash
+# Ensure proper permissions
+chmod +x universalServerSetup\ -\ Working.sh
+# Run with appropriate user privileges
+```
+
+### Log Analysis
+- Installation logs: `logs/install-YYYYMMDD-HHMMSS.log`
+- Server logs: `logs/latest.log`
+- Debug mode: Use `--verbose` for detailed output
+- Dry run: Use `--dry-run` to preview changes
+
+### Getting Help
+- Check the comprehensive logs in the `logs/` directory
+- Use `--verbose` mode for detailed debugging information
+- Review the configuration section at the top of the script
+- Consult the ToDo.md file for known limitations and planned features
+
+## Notes & Best Practices
+
+- **Testing**: Always test with `--dry-run` before production deployment
+- **Backups**: Enable automatic backups for production servers (`BACKUP_INTERVAL_HOURS`)
+- **Security**: Configure proper firewalls and user permissions
+- **Performance**: Adjust `MEMORY_PERCENT` based on server usage patterns
+- **Updates**: Re-run the script with new modpack versions to update existing installations
+- **Monitoring**: Use systemd integration for production deployments with proper logging
+
+## Contributing
+
+We welcome contributions! Please:
+
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
+3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
+4. **Push** to the branch (`git push origin feature/amazing-feature`)
+5. **Open** a Pull Request
+
+### Development Setup
+```bash
+# Clone your fork
+git clone https://github.com/yourusername/MinecraftServerInstall.git
+cd MinecraftServerInstall
+
+# Test your changes
+./universalServerSetup\ -\ Working.sh --dry-run test-modpack.zip
+```
 
 ## Support
 
-For issues, suggestions, or contributions, please open an **Issue** or **Pull Request** on GitHub.
+- 🐛 **Bug Reports**: Open an issue with detailed logs and system information
+- 💡 **Feature Requests**: Check ToDo.md first, then open an issue
+- 📖 **Documentation**: Help improve this README or script comments
+- 💬 **Questions**: Use GitHub Discussions for general questions
+
+For urgent issues, include:
+- Operating system and version
+- Minecraft/modpack version
+- Complete installation log
+- Steps to reproduce the issue
