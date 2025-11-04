@@ -140,6 +140,10 @@ append_file() {
 parse_args() {
   while [ $# -gt 0 ]; do
     case "$1" in
+      --ram)
+        shift; RAM_SIZE="$1" ;;
+      --ram=*)
+        RAM_SIZE="${1#--ram=}" ;;
       --yes) ASSUME_YES=1 ;;
       --assume-no) ASSUME_NO=1 ;;
       --no-eula-prompt) NO_EULA_PROMPT=1 ;;
@@ -364,43 +368,54 @@ setup_java() {
 }
 
 # Detect system memory and return appropriate JVM args (configurable percent of system RAM)
+parse_ram_size() {
+  # Validate and parse RAM size string (e.g. 6G, 8192M)
+  local val="$1"
+  local num unit mb
+  if [[ "$val" =~ ^([0-9]+)([GgMm])$ ]]; then
+    num="${BASH_REMATCH[1]}"
+    unit="${BASH_REMATCH[2]}"
+    if [[ "$unit" =~ [Gg] ]]; then
+      mb=$((num * 1024))
+    else
+      mb=$num
+    fi
+    # Clamp to min/max
+    if [ "$mb" -lt "$MIN_MEMORY_MB" ]; then mb="$MIN_MEMORY_MB"; fi
+    if [ "$mb" -gt "$MAX_MEMORY_MB" ]; then mb="$MAX_MEMORY_MB"; fi
+    echo "-Xms${mb}M -Xmx${mb}M"
+    return 0
+  fi
+  return 1
+}
+
 get_memory_args() {
+  # Prefer explicit RAM override
+  if [ -n "$RAM_SIZE" ]; then
+    parse_ram_size "$RAM_SIZE" && return 0
+    log_warn "Invalid RAM size: $RAM_SIZE. Falling back to dynamic allocation."
+  fi
   local mem_kb mem_mb mem_target
-  
-  # Try various methods to detect RAM
   if [ -r /proc/meminfo ]; then
-    # Linux: Read from /proc/meminfo
     mem_kb=$(grep '^MemTotal:' /proc/meminfo | awk '{print $2}')
     mem_mb=$((mem_kb / 1024))
   elif command -v sysctl >/dev/null 2>&1; then
-    # macOS and BSD: Use sysctl
     mem_mb=$(sysctl -n hw.memsize 2>/dev/null | awk '{print int($1/1024/1024)}' || echo 0)
   elif command -v wmic >/dev/null 2>&1; then
-    # Windows (WSL): Use wmic
     mem_mb=$(wmic computersystem get totalphysicalmemory 2>/dev/null | grep -v Total | awk '{print int($1/1024/1024)}' || echo 0)
   else
-    # Fallback: Use conservative default values
-    echo "-Xms4G -Xmx8G"
+    log_warn "Unable to detect system memory. Defaulting to 4G."
+    echo "-Xms4G -Xmx4G"
     return 0
   fi
-
-  # If detection failed or invalid value, use default
   if [ -z "$mem_mb" ] || [ "$mem_mb" -lt 1024 ]; then
-    echo "-Xms4G -Xmx8G"
+    log_warn "Detected RAM too low (<1G). Defaulting to 4G."
+    echo "-Xms4G -Xmx4G"
     return 0
   fi
-
-  # Calculate target (% of total memory per config)
   mem_target=$((mem_mb * MEMORY_PERCENT / 100))
-
-  # Clamp to configured min/max
-  if [ "$mem_target" -lt "$MIN_MEMORY_MB" ]; then
-    mem_target="$MIN_MEMORY_MB"
-  elif [ "$mem_target" -gt "$MAX_MEMORY_MB" ]; then
-    mem_target="$MAX_MEMORY_MB"
-  fi
-
-  # Return formatted JVM arguments
+  if [ "$mem_target" -lt "$MIN_MEMORY_MB" ]; then mem_target="$MIN_MEMORY_MB"; fi
+  if [ "$mem_target" -gt "$MAX_MEMORY_MB" ]; then mem_target="$MAX_MEMORY_MB"; fi
   echo "-Xms${mem_target}M -Xmx${mem_target}M"
 }
 

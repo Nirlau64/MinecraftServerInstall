@@ -49,9 +49,9 @@ Akzeptanzkriterien:
 
 Ziel: RAM nicht nur dynamisch (75 %), sondern auch explizit konfigurierbar.
 
-- [ ] Flag `--ram <SIZE>` (z. B. `6G`, `8192M`) und ENV `RAM=<SIZE>` respektieren.
-- [ ] Validierung: Einheit `G`/`M`, Minimum 1G, konfigurierbares Maximum (Default 32G).
-- [ ] `start.sh` nutzt dieselbe Quelle/Logik, um Doppelimplementierung zu vermeiden.
+- [x] Flag `--ram <SIZE>` (z. B. `6G`, `8192M`) und ENV `RAM=<SIZE>` respektieren.
+- [x] Validierung: Einheit `G`/`M`, Minimum 1G, konfigurierbares Maximum (Default 32G).
+- [x] `start.sh` nutzt dieselbe Quelle/Logik, um Doppelimplementierung zu vermeiden.
 
 Akzeptanzkriterien:
 - `--ram 6G` führt zu `-Xms6G -Xmx6G` (Erstlauf und `start.sh`).
