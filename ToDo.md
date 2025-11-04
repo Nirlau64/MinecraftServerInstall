@@ -110,10 +110,10 @@ Akzeptanzkriterien:
 
 Ziel: Mehrere Welten komfortabel verwalten und sichern.
 
-- [ ] Flag `--world <name>` bzw. ENV `WORLD=<name>` → setzt `level-name=<name>`.
-- [ ] Funktion `backup()` komprimiert `world/` bzw. `<name>/` nach `backups/<name>-YYYYmmdd-HHMMSS.zip`.
-- [ ] `--pre-backup` ermöglicht automatisches Backup vor größeren Änderungen (z. B. Mod-Updates).
-- [ ] `--restore <zip>` entpackt ZIP ins Ziel (mit Bestätigung/`--force`).
+- [x] Flag `--world <name>` bzw. ENV `WORLD=<name>` → setzt `level-name=<name>`.
+- [x] Funktion `backup()` komprimiert `world/` bzw. `<name>/` nach `backups/<name>-YYYYmmdd-HHMMSS.zip`.
+- [x] `--pre-backup` ermöglicht automatisches Backup vor größeren Änderungen (z. B. Mod-Updates).
+- [x] `--restore <zip>` entpackt ZIP ins Ziel (mit Bestätigung/`--force`).
 
 Akzeptanzkriterien:
 - `--world creative1` nutzt/erzeugt die korrekte Welt.

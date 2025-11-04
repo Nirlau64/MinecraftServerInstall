@@ -192,6 +192,49 @@ setup_log_file
 
 # -----------------------------------------------------------------------------
 # Utility helpers
+# Backup world function: compress world/<name> to backups/<name>-YYYYmmdd-HHMMSS.zip
+backup_world() {
+  local name="${WORLD_NAME:-world}"
+  local src="$name"
+  [ -d "$src" ] || src="world"
+  local ts="$(date '+%Y%m%d-%H%M%S')"
+  local backup_dir="backups"
+  local backup_zip="$backup_dir/${name}-$ts.zip"
+  mkdir -p "$backup_dir"
+  if [ -d "$src" ]; then
+    log_info "Backing up world '$src' to $backup_zip"
+    zip -rq "$backup_zip" "$src"
+    log_info "Backup complete: $backup_zip"
+  else
+    log_warn "World directory '$src' not found, skipping backup."
+  fi
+}
+
+# Restore world function: extract zip to world/<name> (with confirmation)
+restore_world() {
+  local zip="$RESTORE_ZIP"
+  if [ ! -f "$zip" ]; then
+    log_err "Restore zip not found: $zip"
+    exit 1
+  fi
+  local name="${WORLD_NAME:-world}"
+  local target="$name"
+  if [ -d "$target" ]; then
+    if [ "$FORCE" = "1" ]; then
+      log_warn "Overwriting existing world '$target' due to --force."
+      rm -rf "$target"
+    else
+      if ! ask_yes_no "World '$target' exists. Overwrite with backup?" "no"; then
+        log_warn "Restore cancelled by user."
+        return 1
+      fi
+      rm -rf "$target"
+    fi
+  fi
+  log_info "Restoring world from $zip to $target"
+  unzip -q "$zip" -d .
+  log_info "Restore complete."
+}
 # -----------------------------------------------------------------------------
 
 # Returns 0 if argument is a truthy value (yes, true, 1, etc.), else 1
@@ -330,6 +373,15 @@ parse_args() {
 parse_args "$@"
 
 # Prepare working directory
+# Pre-backup if requested
+if [ "${PRE_BACKUP:-0}" = "1" ]; then
+  backup_world
+fi
+
+# Restore if requested
+if [ -n "${RESTORE_ZIP:-}" ]; then
+  restore_world
+fi
 run rm -rf "$WORK"
 run mkdir -p "$WORK"
 
@@ -1290,7 +1342,7 @@ create_server_properties_template() {
   write_file "$file" "# Minecraft server properties (auto-generated)\n"
   append_file "$file" "# For details see https://minecraft.fandom.com/wiki/Server.properties\n"
   append_file "$file" "# Generated: $(date '+%Y-%m-%d %H:%M:%S')\n"
-  append_file "$file" "motd=$PROP_MOTD\ndifficulty=$PROP_DIFFICULTY\npvp=$PROP_PVP\nview-distance=$PROP_VIEW_DISTANCE\nwhite-list=$PROP_WHITE_LIST\nmax-players=$PROP_MAX_PLAYERS\nspawn-protection=$PROP_SPAWN_PROTECTION\nallow-nether=$PROP_ALLOW_NETHER\nlevel-name=$PROP_LEVEL_NAME\nlevel-seed=$PROP_LEVEL_SEED\nlevel-type=$PROP_LEVEL_TYPE\n"
+  append_file "$file" "motd=$PROP_MOTD\ndifficulty=$PROP_DIFFICULTY\npvp=$PROP_PVP\nview-distance=$PROP_VIEW_DISTANCE\nwhite-list=$PROP_WHITE_LIST\nmax-players=$PROP_MAX_PLAYERS\nspawn-protection=$PROP_SPAWN_PROTECTION\nallow-nether=$PROP_ALLOW_NETHER\nlevel-name=${WORLD_NAME:-$PROP_LEVEL_NAME}\nlevel-seed=$PROP_LEVEL_SEED\nlevel-type=$PROP_LEVEL_TYPE\n"
   log_info "server.properties template created."
 }
 
@@ -1333,6 +1385,15 @@ update_server_properties_from_env() {
         ;;
     esac
   done < "$env_file"
+  # Multi-world mapping: WORLD_NAME sets level-name
+  if [ -n "$WORLD_NAME" ]; then
+    if grep -q "^level-name=" "$prop_file"; then
+      sed -i "s|^level-name=.*|level-name=$WORLD_NAME|" "$prop_file"
+    else
+      echo "level-name=$WORLD_NAME" >> "$prop_file"
+    fi
+    log_info "Set level-name from WORLD_NAME: $WORLD_NAME"
+  fi
 }
 update_server_properties_from_env
   # Multi-world mapping: WORLD env sets level-name
