@@ -24,6 +24,8 @@ It supports **Forge**, **NeoForge**, **Fabric**, and **Quilt** loaders and can h
 
 ## Quick Start
 
+> 📖 **Für einen kompletten Workflow-Guide mit allen Möglichkeiten und Szenarien**, siehe: **[WORKFLOW_COMPLETE.md](WORKFLOW_COMPLETE.md)**
+
 ### GUI Mode (Recommended for beginners)
 ```bash
 # Start the GUI - works even before server setup
@@ -511,3 +513,17 @@ For urgent issues, include:
 - Minecraft/modpack version
 - Complete installation log
 - Steps to reproduce the issue
+
+---
+
+## 📚 Umfassende Dokumentation
+
+**[→ Kompletter Workflow-Guide (WORKFLOW_COMPLETE.md)](WORKFLOW_COMPLETE.md)**
+
+Dieser detaillierte Guide enthält:
+- ✅ Alle verfügbaren Modi (GUI, Kommandozeile, vollautomatisch)
+- ✅ Schritt-für-Schritt-Anleitungen für jeden Anwendungsfall
+- ✅ Komplette Parameterliste mit Beispielen
+- ✅ Szenarien für Anfänger bis Produktions-Server
+- ✅ Troubleshooting & Debug-Tipps
+- ✅ CI/CD-Integration und Automatisierung
