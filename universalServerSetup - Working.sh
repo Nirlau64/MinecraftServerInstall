@@ -125,7 +125,16 @@ parse_args "$@"
 run rm -rf "$WORK"
 run mkdir -p "$WORK"
 
-# Ask helper: prompt user in terminal; when no terminal is available, use provided default (yes/no)
+################################################################################
+# Funktion: ask_yes_no
+# Beschreibung: Fragt den Benutzer interaktiv nach Ja/Nein-Antwort
+# Parameter:
+#   $1 - prompt: Die Frage an den Benutzer (Standard: "Proceed?")
+#   $2 - default: Standard-Antwort für nicht-interaktive Nutzung ("yes"/"no")
+# Rückgabe:
+#   0 - Benutzer hat "Ja" gewählt oder default ist "yes"
+#   1 - Benutzer hat "Nein" gewählt oder default ist "no"
+################################################################################
 ask_yes_no() {
   local prompt="${1:-Proceed?}"
   local default="${2:-no}"
@@ -133,6 +142,7 @@ ask_yes_no() {
   if [ "$ASSUME_YES" = 1 ]; then return 0; fi
   if [ "$ASSUME_NO" = 1 ]; then return 1; fi
   if [ -t 0 ]; then
+    # Interaktiver Modus: Frage den Benutzer
     while true; do
       read -r -p "$prompt [y/N]: " ans
       case "$ans" in
@@ -144,7 +154,7 @@ ask_yes_no() {
       esac
     done
   else
-    # No interactive terminal; fall back to default
+    # Nicht-interaktiver Modus: Verwende Default-Wert
     if [ "$default" = "yes" ]; then
       return 0
     else
@@ -153,47 +163,74 @@ ask_yes_no() {
   fi
 }
 
-# Check required commands are available
+################################################################################
+# Funktion: require_cmd
+# Beschreibung: Prüft ob alle benötigten Befehle verfügbar sind
+# Parameter:
+#   $@ - Liste der zu prüfenden Befehle
+# Rückgabe:
+#   0 - Alle Befehle sind verfügbar
+#   exit 1 - Mindestens ein Befehl fehlt
+################################################################################
 require_cmd() {
   local missing=0
   for c in "$@"; do
     if ! command -v "$c" >/dev/null 2>&1; then
-      echo "Required command not found: $c" >&2
+      echo "FEHLER: Benötigter Befehl nicht gefunden: $c" >&2
+      echo "Bitte installieren Sie $c und versuchen Sie es erneut." >&2
       missing=1
     fi
   done
   [ $missing -eq 0 ] || exit 1
 }
 
-# Detect required Java version and install if needed
+################################################################################
+# Funktion: setup_java
+# Beschreibung: Erkennt die benötigte Java-Version und installiert sie bei Bedarf
+# Parameter:
+#   $1 - mc_ver: Minecraft-Version (z.B. "1.20.1")
+# Rückgabe:
+#   0 - Java ist korrekt installiert
+#   exit 1 - Installation fehlgeschlagen
+# Logik:
+#   - MC 1.20.5+ benötigt Java 21
+#   - MC 1.17-1.20.4 benötigt Java 17
+#   - MC <1.17 benötigt Java 8
+################################################################################
 setup_java() {
   local mc_ver="$1"
   local java_ver
   
-  # Determine required Java version
-  if printf '%s\n' "1.17" "$mc_ver" | sort -V | head -n1 | grep -q "^1.17"; then
-    # MC 1.17+ requires Java 17
+  # Bestimme benötigte Java-Version basierend auf Minecraft-Version
+  # MC 1.20.5+ benötigt Java 21 (class file version 65.0)
+  if printf '%s\n' "1.20.5" "$mc_ver" | sort -V | head -n1 | grep -q "^1.20.5"; then
+    java_ver=21
+  # MC 1.17-1.20.4 benötigt Java 17 (class file version 61.0)
+  elif printf '%s\n' "1.17" "$mc_ver" | sort -V | head -n1 | grep -q "^1.17"; then
     java_ver=17
+  # MC <1.17 benötigt Java 8
   else
-    # Older versions use Java 8
     java_ver=8
   fi
 
   log_info "Minecraft $mc_ver requires Java $java_ver"
   
-  # Check if correct Java is already installed
+  # Prüfe ob bereits eine kompatible Java-Version installiert ist
   if command -v java >/dev/null 2>&1; then
     local java_output current_ver
     java_output=$(java -version 2>&1)
   log_info "Java version output: $java_output"
     
-    # Enhanced version detection for different formats
+    # Erweiterte Versions-Erkennung für verschiedene Ausgabeformate
+    # Format 1: "1.8.0_xxx" -> Java 8
     if echo "$java_output" | grep -q "version \"1.8"; then
       current_ver=8
+    # Format 2: "1.11.x" -> Java 11 (für Kompatibilität)
     elif echo "$java_output" | grep -q "version \"1.1"; then
       current_ver=11
+    # Format 3: "17.0.x", "21.0.x" etc. -> Hauptversion extrahieren
     else
-      current_ver=$(echo "$java_output" | grep version | awk -F '"' '{print $2}' | awk -F '[.|-]' '{print $1}')
+      current_ver=$(echo "$java_output" | grep -i version | head -n1 | awk -F '"' '{print $2}' | awk -F '[.|-]' '{print $1}')
     fi
     
     log_info "Detected Java version: $current_ver"
@@ -204,7 +241,9 @@ setup_java() {
     log_warn "Found Java $current_ver, but Java $java_ver is required"
   fi
 
-  # Install required Java version
+  # Installiere benötigte Java-Version basierend auf dem Package Manager
+  echo "Installiere Java $java_ver..."
+  
   if command -v apt-get >/dev/null 2>&1; then
     # Debian/Ubuntu
     log_info "Installing Java $java_ver via apt..."
@@ -246,23 +285,24 @@ setup_java() {
     exit 1
   fi
 
-  # Verify installation
+  # Verifiziere dass Java nach der Installation verfügbar ist
   if ! command -v java >/dev/null 2>&1; then
     log_err "Java installation failed. Please install Java $java_ver manually."
     exit 1
   fi
 
+  # Prüfe installierte Java-Version
   local java_output installed_ver
   java_output=$(java -version 2>&1)
   log_info "Post-install Java version output: $java_output"
   
-  # Enhanced version detection (same as above)
+  # Erweiterte Versions-Erkennung (wie oben)
   if echo "$java_output" | grep -q "version \"1.8"; then
     installed_ver=8
   elif echo "$java_output" | grep -q "version \"1.1"; then
     installed_ver=11
   else
-    installed_ver=$(echo "$java_output" | grep version | awk -F '"' '{print $2}' | awk -F '[.|-]' '{print $1}')
+    installed_ver=$(echo "$java_output" | grep -i version | head -n1 | awk -F '"' '{print $2}' | awk -F '[.|-]' '{print $1}')
   fi
   
   if [ "$installed_ver" != "$java_ver" ]; then
@@ -281,24 +321,25 @@ setup_java() {
 # Detect system memory and return appropriate JVM args (configurable percent of system RAM)
 get_memory_args() {
   local mem_kb mem_mb mem_target
-  # Try various methods to get system memory
+  
+  # Versuche verschiedene Methoden zur RAM-Erkennung
   if [ -r /proc/meminfo ]; then
-    # Linux
+    # Linux: Lese aus /proc/meminfo
     mem_kb=$(grep '^MemTotal:' /proc/meminfo | awk '{print $2}')
     mem_mb=$((mem_kb / 1024))
   elif command -v sysctl >/dev/null 2>&1; then
-    # macOS and BSD
+    # macOS und BSD: Verwende sysctl
     mem_mb=$(sysctl -n hw.memsize 2>/dev/null | awk '{print int($1/1024/1024)}' || echo 0)
   elif command -v wmic >/dev/null 2>&1; then
-    # Windows
-    mem_mb=$(wmic computersystem get totalphysicalmemory | grep -v Total | awk '{print int($1/1024/1024)}' || echo 0)
+    # Windows (WSL): Verwende wmic
+    mem_mb=$(wmic computersystem get totalphysicalmemory 2>/dev/null | grep -v Total | awk '{print int($1/1024/1024)}' || echo 0)
   else
-    # Fallback to default if we can't detect
+    # Fallback: Verwende konservative Standard-Werte
     echo "-Xms4G -Xmx8G"
     return 0
   fi
 
-  # If detection failed or returned 0, use conservative defaults
+  # Wenn Erkennung fehlschlug oder ungültiger Wert, verwende Standard
   if [ -z "$mem_mb" ] || [ "$mem_mb" -lt 1024 ]; then
     echo "-Xms4G -Xmx8G"
     return 0
@@ -314,7 +355,7 @@ get_memory_args() {
     mem_target="$MAX_MEMORY_MB"
   fi
 
-  # Return formatted args
+  # Gib formatierte JVM-Argumente zurück
   echo "-Xms${mem_target}M -Xmx${mem_target}M"
 }
 
@@ -328,7 +369,9 @@ get_memory_args() {
 # 3) other server jars excluding vanilla
 detect_server_jar() {
   local j
-  # First priority: explicit modded server jars
+  
+  # Priorität 1: Explizite Modloader-Server-JARs
+  # Forge (klassisch und neue Versionen)
   j=$(ls -1 forge-*-server*.jar forge-*.jar 2>/dev/null | grep -v installer | head -n1 || true)
   [ -n "$j" ] || j=$(ls -1 neoforge-*-server*.jar neoforge-*.jar 2>/dev/null | grep -v installer | head -n1 || true)
   [ -n "$j" ] || j=$(ls -1 fabric-server-launch.jar fabric-server*.jar 2>/dev/null | head -n1 || true)
@@ -337,11 +380,11 @@ detect_server_jar() {
   [ -n "$j" ] || j=$(ls -1 run*.jar 2>/dev/null | head -n1 || true)
   if [ -n "$j" ]; then printf '%s' "$j"; return 0; fi
 
-  # Second priority: server jars excluding vanilla minecraft_server
+  # Priorität 2: Server-JARs (außer Vanilla minecraft_server)
   j=$(ls -1 *-server*.jar 2>/dev/null | grep -v "minecraft_server" | head -n1 || true)
   if [ -n "$j" ]; then printf '%s' "$j"; return 0; fi
 
-  # fallback: largest jar excluding installer jars
+  # Fallback: Größte JAR-Datei (außer Installer)
   j=$(ls -S *.jar 2>/dev/null | grep -v -i installer | head -n1 || true)
   printf '%s' "$j"
 }
@@ -434,13 +477,17 @@ run unzip -q "$ZIP" -d "$WORK"
 HAS_START=$(grep -rilE 'startserver\.sh|start\.sh' "$WORK" || true)
 HAS_MANIFEST=$(find "$WORK" -maxdepth 3 -name manifest.json | head -n1 || true)
 
+################################################################################
+# PFAD 1: Server-Pack Installation
+################################################################################
 if [ -n "$HAS_START" ]; then
   log_info "[2/7] Server files detected."
   # Try to detect MC version from server jar name or manifest
   MC_VER=$(ls minecraft_server.*.jar 2>/dev/null | grep -o '[0-9.]*' | head -n1 || true)
-  [ -z "$MC_VER" ] && MC_VER=$(find . -name manifest.json -exec jq -r '.minecraft.version // empty' {} \; 2>/dev/null | head -n1 || true)
+  [ -z "$MC_VER" ] && MC_VER=$(find "$WORK" -name manifest.json -exec jq -r '.minecraft.version // empty' {} \; 2>/dev/null | head -n1 || true)
   [ -z "$MC_VER" ] && MC_VER=$(ls forge-*.jar 2>/dev/null | grep -o '1\.[0-9.]*' | head -n1 || true)
   
+  # Setup Java basierend auf erkannter MC-Version
   if [ -n "$MC_VER" ]; then
     setup_java "$MC_VER"
   else
@@ -584,25 +631,41 @@ EOFMARKER1
   fi
   chmod +x start.sh
 
-  echo "[4/7] Server files path complete."
+  echo ""
+  echo "[7/7] Server-Pack Installation abgeschlossen!"
+  echo "========================================="
+  echo "Der Server ist bereit."
+  echo "Starten mit: ./start.sh"
+  echo "========================================="
   exit 0
 fi
 
+################################################################################
+# PFAD 2: Client-Export Konvertierung
+################################################################################
 if [ -z "$HAS_MANIFEST" ]; then
-  echo "Neither server files nor manifest.json found. Aborting."
+  echo "FEHLER: Weder Server-Dateien noch manifest.json gefunden." >&2
+  echo "Bitte stellen Sie sicher, dass Sie ein gültiges Modpack-ZIP verwenden." >&2
   exit 1
 fi
 
 log_info "[2/7] Client export detected. Parsing manifest.json..."
 MAN="$HAS_MANIFEST"
-MC_VER=$(jq -r '.minecraft.version' "$MAN")
 
-# Setup correct Java version for this MC version
+# Parse Manifest-Daten
+MC_VER=$(jq -r '.minecraft.version' "$MAN" 2>/dev/null)
+if [ -z "$MC_VER" ] || [ "$MC_VER" = "null" ]; then
+  echo "FEHLER: Konnte Minecraft-Version nicht aus manifest.json lesen" >&2
+  exit 1
+fi
+
+# Installiere korrekte Java-Version für diese MC-Version
 setup_java "$MC_VER"
 
-# manifest loader id parsing with fallbacks
-LOADER_ID=$(jq -r '.minecraft.modLoaders[0].id // .modLoaders[0].id // .modLoaders[0].uid // .modLoader // ""' "$MAN" | tr '[:upper:]' '[:lower:]')
-# LOADER_ID examples: "forge-47.2.0", "neoforge-20.6.120", "fabric"
+# Parse Modloader-ID mit verschiedenen Fallbacks
+# Verschiedene Manifest-Formate verwenden unterschiedliche Pfade
+LOADER_ID=$(jq -r '.minecraft.modLoaders[0].id // .modLoaders[0].id // .modLoaders[0].uid // .modLoader // ""' "$MAN" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+# Beispiel-Werte: "forge-47.2.0", "neoforge-20.6.120", "fabric-0.15.0"
 
 log_info "Minecraft: $MC_VER"
 log_info "Loader:    $LOADER_ID"
@@ -610,6 +673,13 @@ log_info "Loader:    $LOADER_ID"
 cd "$SRVDIR"
 log_info "[3/7] Installing server loader..."
 
+################################################################################
+# Funktion: download_forge
+# Beschreibung: Lädt und installiert Forge Server
+# Parameter:
+#   $1 - mc: Minecraft-Version (z.B. "1.20.1")
+#   $2 - forge: Forge-Version (z.B. "47.2.0")
+################################################################################
 download_forge() {
   local mc="$1" forge="$2"
   local base="https://maven.minecraftforge.net/net/minecraftforge/forge/${mc}-${forge}"
@@ -620,7 +690,6 @@ download_forge() {
 }
 
 download_neoforge() {
-  # NeoForge coordinates are just the single version string e.g. 20.6.120
   local ver="$1"
   local base="https://maven.neoforged.net/releases/net/neoforged/forge/${ver}"
   local inst="forge-${ver}-installer.jar"
@@ -630,7 +699,7 @@ download_neoforge() {
 }
 
 download_fabric() {
-  # Get latest stable installer
+  local mc_ver="$1"
   local INST="fabric-installer.jar"
   run curl -fL "https://meta.fabricmc.net/v2/versions/installer" -o _fabric.json
   local URL
@@ -641,24 +710,33 @@ download_fabric() {
 
 case "$LOADER_ID" in
   forge-*)
+    # Forge (klassisch)
     FORGE_VER="${LOADER_ID#forge-}"
+    echo "Installiere Forge $FORGE_VER..."
     download_forge "$MC_VER" "$FORGE_VER"
-    SRVJAR=$(ls -1 forge-*-server*.jar | head -n1 || true)
-    [ -z "$SRVJAR" ] && SRVJAR=$(ls -1 run-*.jar | head -n1 || true)
+    # Suche nach generierter Server-JAR
+    SRVJAR=$(ls -1 forge-*-server*.jar 2>/dev/null | head -n1 || true)
+    [ -z "$SRVJAR" ] && SRVJAR=$(ls -1 run-*.jar 2>/dev/null | head -n1 || true)
     ;;
   neoforge-*)
+    # NeoForge (Forge-Fork für neuere Versionen)
     NEO_VER="${LOADER_ID#neoforge-}"
+    echo "Installiere NeoForge $NEO_VER..."
     download_neoforge "$NEO_VER"
-    SRVJAR=$(ls -1 neoforge-*-server*.jar | head -n1 || true)
-    [ -z "$SRVJAR" ] && SRVJAR=$(ls -1 run-*.jar | head -n1 || true)
+    SRVJAR=$(ls -1 neoforge-*-server*.jar 2>/dev/null | head -n1 || true)
+    [ -z "$SRVJAR" ] && SRVJAR=$(ls -1 run-*.jar 2>/dev/null | head -n1 || true)
     ;;
   fabric*)
+    # Fabric
+    echo "Installiere Fabric..."
     download_fabric "$MC_VER"
     SRVJAR="fabric-server-launch.jar"
     ;;
   quilt*|quilt)
-    # Basic Quilt support: many packs ship quilt-server-launch.jar; automatic installer download not implemented.
-    echo "Quilt loader detected. If installer is missing, you may need to install Quilt server manually." >&2
+    # Quilt (Fabric-Fork mit erweiterten Features)
+    echo "Quilt-Loader erkannt."
+    echo "HINWEIS: Automatische Quilt-Installation nicht implementiert." >&2
+    echo "Falls quilt-server-launch.jar fehlt, installieren Sie Quilt manuell." >&2
     SRVJAR="quilt-server-launch.jar"
     ;;
   *)
@@ -676,15 +754,25 @@ if [ -d "$WORK/overrides" ]; then
   ls -la "$WORK/overrides"
 fi
 
-# CurseForge client export puts overrides into /overrides or /overrides/<mods|config|kubejs|defaultconfigs>
-# Some packs use /mods directly in the zip.
+# CurseForge Client-Exports verwenden verschiedene Strukturen:
+# - /overrides/<mods|config|kubejs|defaultconfigs|...>
+# - /mods, /config direkt im ZIP
+# - /server-overrides für server-spezifische Dateien
 mkdir -p mods config
 
-# Function to copy with verbose output
+################################################################################
+# Funktion: copy_with_log
+# Beschreibung: Kopiert Verzeichnisse mit Logging und Fehlerbehandlung
+# Parameter:
+#   $1 - src: Quell-Verzeichnis
+#   $2 - dst: Ziel-Verzeichnis
+#   $3 - type: Beschreibung für Logging
+################################################################################
 copy_with_log() {
   local src="$1"
   local dst="$2"
   local type="$3"
+  
   if [ -d "$src" ]; then
     log_info "Copying $type from $src"
   if run rsync -av "$src/" "$dst/"; then
@@ -698,15 +786,18 @@ copy_with_log() {
   fi
 }
 
-# Priority: overrides first, then top-level detected folders
-copy_with_log "$WORK/overrides/mods" "./mods" "mods (overrides)"
-copy_with_log "$WORK/overrides/config" "./config" "config (overrides)"
-copy_with_log "$WORK/mods" "./mods" "mods (top-level)"
-copy_with_log "$WORK/config" "./config" "config (top-level)"
+# Kopier-Priorität: overrides > server-overrides > top-level
+# Dies stellt sicher, dass server-spezifische Dateien Vorrang haben
 
-# Also copy server-overrides and client-overrides if present
-copy_with_log "$WORK/server-overrides/mods" "./mods" "mods (server-overrides)"
-copy_with_log "$WORK/server-overrides/config" "./config" "config (server-overrides)"
+echo "Kopiere Haupt-Verzeichnisse:"
+copy_with_log "$WORK/overrides/mods" "./mods" "Mods (overrides)"
+copy_with_log "$WORK/overrides/config" "./config" "Config (overrides)"
+copy_with_log "$WORK/mods" "./mods" "Mods (top-level)"
+copy_with_log "$WORK/config" "./config" "Config (top-level)"
+
+echo "Kopiere Server-spezifische Overrides:"
+copy_with_log "$WORK/server-overrides/mods" "./mods" "Mods (server-overrides)"
+copy_with_log "$WORK/server-overrides/config" "./config" "Config (server-overrides)"
 
 # Also bring scripts or other common dirs if present
 for d in kubejs defaultconfigs scripts libraries; do
@@ -764,6 +855,8 @@ if ask_yes_no "Run the server once now to generate files and finish setup (recom
 else
   log_warn "Skipping first run. You can start the server later with ./start.sh"
 fi
+echo ""
+echo "Erstelle start.sh Script..."
 
 # Optionally add OP entry after (or regardless of) first run
 op_user_if_configured || true
@@ -774,10 +867,17 @@ if [ "$DRY_RUN" = 1 ]; then
 else
 cat > start.sh <<"EOFMARKER2"
 #!/usr/bin/env bash
+################################################################################
+# Minecraft Server Start Script
+# Automatisch generiert von universalServerSetup.sh
+################################################################################
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# Function to detect server jar, copied from main script for standalone use
+################################################################################
+# Funktion: detect_server_jar
+# Beschreibung: Findet die Server-JAR-Datei (Kopie aus Haupt-Script)
+################################################################################
 detect_server_jar() {
   local j
   # First priority: explicit modded server jars
@@ -797,28 +897,35 @@ detect_server_jar() {
   printf '%s' "$j"
 }
 
-# First try to read the jar name from the stored file
+################################################################################
+# JAR-Datei ermitteln
+################################################################################
+# Versuche zuerst aus gespeicherter Datei zu lesen
 if [ -r .server_jar ]; then
   JAR=$(cat .server_jar)
 else
-  # If file not found, detect it again
+  # Falls nicht vorhanden, erneut erkennen
   JAR=$(detect_server_jar)
 fi
 
-# Validate jar exists
+# Validiere dass JAR existiert
 if [ ! -f "$JAR" ]; then
-  echo "Server jar not found: $JAR" >&2
-  echo "Trying to detect again..." >&2
+  echo "FEHLER: Server-JAR nicht gefunden: $JAR" >&2
+  echo "Versuche erneute Erkennung..." >&2
   JAR=$(detect_server_jar)
   if [ ! -f "$JAR" ]; then
-    echo "Could not find a valid server jar. Please check your installation." >&2
+    echo "FEHLER: Konnte keine gültige Server-JAR finden." >&2
+    echo "Bitte überprüfen Sie die Installation." >&2
     exit 1
   fi
-  # Update the stored jar name
+  # Aktualisiere gespeicherten JAR-Namen
   echo "$JAR" > .server_jar
 fi
 
-# Get memory args (copied from main script)
+################################################################################
+# Funktion: get_memory_args
+# Beschreibung: Ermittelt optimale Speicher-Einstellungen
+################################################################################
 get_memory_args() {
   local mem_kb mem_mb mem_target
   if [ -r /proc/meminfo ]; then
@@ -839,9 +946,17 @@ get_memory_args() {
   echo "-Xms${mem_target}M -Xmx${mem_target}M"
 }
 
+################################################################################
+# Server starten
+################################################################################
 JAVA_ARGS="${JAVA_ARGS:-$(get_memory_args)}"
-echo "Starting server with jar: $JAR"
-echo "Memory settings: $JAVA_ARGS"
+echo "========================================="
+echo "Starte Minecraft Server"
+echo "========================================="
+echo "Server-JAR: $JAR"
+echo "Speicher:   $JAVA_ARGS"
+echo "========================================="
+echo ""
 exec java $JAVA_ARGS -jar "$JAR" nogui
 EOFMARKER2
 fi
