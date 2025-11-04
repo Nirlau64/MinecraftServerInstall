@@ -37,6 +37,8 @@ source "$SCRIPT_DIR/lib/logging.sh"
 source "$SCRIPT_DIR/lib/validation.sh"
 source "$SCRIPT_DIR/lib/java.sh"
 source "$SCRIPT_DIR/lib/server.sh"
+source "$SCRIPT_DIR/lib/config.sh"
+source "$SCRIPT_DIR/lib/system.sh"
 
 # Trap to ensure Python 3 cleanup on exit
 cleanup_on_exit() {
@@ -76,20 +78,8 @@ trap cleanup_on_exit EXIT INT TERM
 # -----------------------------------------------------------------------------
 # CONFIGURATION SECTION (User-editable)
 # -----------------------------------------------------------------------------
-# SERVER.PROPERTIES DEFAULTS (User-editable, can be overridden by CLI/env)
-# -----------------------------------------------------------------------------
-PROP_MOTD="Modded Minecraft Server"
-PROP_DIFFICULTY="normal"
-PROP_PVP="true"
-PROP_VIEW_DISTANCE="10"
-PROP_WHITE_LIST="false"
-PROP_MAX_PLAYERS="20"
-PROP_SPAWN_PROTECTION="0"
-PROP_ALLOW_NETHER="true"
-PROP_LEVEL_NAME="world"
-PROP_LEVEL_SEED=""
-PROP_LEVEL_TYPE="default"
-# -----------------------------------------------------------------------------
+# Configuration defaults are now handled by lib/config.sh module
+# Use CLI arguments or .env file to override default values
 
 # Path to the modpack ZIP file to install. Can be set via CLI argument or environment variable ZIP_OVERRIDE.
 ZIP="${ZIP_OVERRIDE:-pack.zip}"
@@ -1106,59 +1096,8 @@ if [ -n "$HAS_START" ]; then
   echo "Starten mit: ./start.sh"
   echo "========================================="
 
-  # --- SYSTEMD GENERATION ---
-  if [ "$SYSTEMD" = 1 ]; then
-    log_info "Generating systemd service file..."
-    mkdir -p dist
-    SERVICE_PATH="dist/minecraft.service"
-    SERVICE_USER="$(id -un)"
-    SERVICE_WORKDIR="$(pwd)"
-    SERVICE_JAVA_ARGS="${JAVA_ARGS:-$(get_memory_args)}"
-    cat > "$SERVICE_PATH" <<EOF
-[Unit]
-Description=Minecraft Server
-After=network.target
-
-[Service]
-Type=simple
-User=$SERVICE_USER
-WorkingDirectory=$SERVICE_WORKDIR
-ExecStart=$SERVICE_WORKDIR/start.sh
-Restart=on-failure
-Environment="JAVA_ARGS=$SERVICE_JAVA_ARGS"
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    log_info "Service file written to $SERVICE_PATH"
-    log_info "To install: sudo cp $SERVICE_PATH /etc/systemd/system/minecraft.service && sudo systemctl enable --now minecraft.service"
-    # Collision detection for systemd
-    if command -v systemctl >/dev/null 2>&1; then
-      if systemctl is-active --quiet minecraft; then
-        log_warn "systemd service 'minecraft' is already active. Status: $(systemctl status minecraft | head -n 5)"
-      elif systemctl is-enabled --quiet minecraft; then
-        log_warn "systemd service 'minecraft' is enabled but not active."
-      fi
-    fi
-  fi
-
-  # --- TMUX GENERATION ---
-  if [ "$TMUX" = 1 ]; then
-    require_cmd tmux
-    # Check if session exists
-    if tmux has-session -t minecraft 2>/dev/null; then
-      log_warn "tmux session 'minecraft' already exists. Attach with: tmux attach -t minecraft"
-    else
-      # Check if systemd service is active before starting tmux
-      if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet minecraft; then
-        log_warn "systemd service 'minecraft' is already running. Not starting tmux session to avoid conflict."
-      else
-        log_info "Starting server in new tmux session 'minecraft'..."
-        tmux new-session -d -s minecraft "$(pwd)/start.sh"
-        log_info "tmux session 'minecraft' started. Attach with: tmux attach -t minecraft"
-      fi
-    fi
-  fi
+  # --- SYSTEM INTEGRATION SETUP ---
+  setup_system_integration
   
   # Cleanup Python 3 if we installed it (server pack path)
   cleanup_python3_if_installed
@@ -1414,71 +1353,16 @@ echo "Erstelle start.sh Script..."
 op_user_if_configured || true
 
 # -----------------------------------------------------------------------------
-# Server properties template creation (5)
+# Server Configuration Setup (5) - Now handled by config module
 # -----------------------------------------------------------------------------
-create_server_properties_template() {
-  local file="server.properties"
-  if [ -f "$file" ]; then
-    log_info "server.properties already exists. Skipping template creation."
-    return 0
-  fi
-  log_info "Creating server.properties template with sensible defaults..."
-  write_file "$file" "# Minecraft server properties (auto-generated)\n"
-  append_file "$file" "# For details see https://minecraft.fandom.com/wiki/Server.properties\n"
-  append_file "$file" "# Generated: $(date '+%Y-%m-%d %H:%M:%S')\n"
-  append_file "$file" "motd=$PROP_MOTD\ndifficulty=$PROP_DIFFICULTY\npvp=$PROP_PVP\nview-distance=$PROP_VIEW_DISTANCE\nwhite-list=$PROP_WHITE_LIST\nmax-players=$PROP_MAX_PLAYERS\nspawn-protection=$PROP_SPAWN_PROTECTION\nallow-nether=$PROP_ALLOW_NETHER\nlevel-name=${WORLD_NAME:-$PROP_LEVEL_NAME}\nlevel-seed=$PROP_LEVEL_SEED\nlevel-type=$PROP_LEVEL_TYPE\n"
-  log_info "server.properties template created."
-}
 
-# Call template creation after OP setup, before final log
+# Load configuration from .env if present
+load_env_config
+
+# Create server properties template with current configuration
 create_server_properties_template
-update_server_properties_from_env() {
-  local env_file=".env"
-  local prop_file="server.properties"
-  [ -f "$env_file" ] || return 0
-  log_info "Updating server.properties from .env..."
-  while IFS='=' read -r key value; do
-    # Skip comments and empty lines
-    [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
-    # Only update known keys
-    case "$key" in
-      DIFFICULTY|PVP|MOTD|VIEW_DISTANCE|WHITE_LIST|MAX_PLAYERS|SPAWN_PROTECTION|ALLOW_NETHER|LEVEL_NAME|LEVEL_SEED|LEVEL_TYPE)
-        # Map env key to server.properties key
-        prop_key=$(echo "$key" | tr '[:upper:]_' '[:lower:]-')
-        prop_key=${prop_key//-/_}
-        # Special cases for mapping
-        case "$key" in
-          DIFFICULTY) prop_key="difficulty";;
-          PVP) prop_key="pvp";;
-          MOTD) prop_key="motd";;
-          VIEW_DISTANCE) prop_key="view-distance";;
-          WHITE_LIST) prop_key="white-list";;
-          MAX_PLAYERS) prop_key="max-players";;
-          SPAWN_PROTECTION) prop_key="spawn-protection";;
-          ALLOW_NETHER) prop_key="allow-nether";;
-          LEVEL_NAME) prop_key="level-name";;
-          LEVEL_SEED) prop_key="level-seed";;
-          LEVEL_TYPE) prop_key="level-type";;
-        esac
-        # Idempotent update: replace or add
-        if grep -q "^$prop_key=" "$prop_file"; then
-          sed -i "s|^$prop_key=.*|$prop_key=$value|" "$prop_file"
-        else
-          echo "$prop_key=$value" >> "$prop_file"
-        fi
-        ;;
-    esac
-  done < "$env_file"
-  # Multi-world mapping: WORLD_NAME sets level-name
-  if [ -n "$WORLD_NAME" ]; then
-    if grep -q "^level-name=" "$prop_file"; then
-      sed -i "s|^level-name=.*|level-name=$WORLD_NAME|" "$prop_file"
-    else
-      echo "level-name=$WORLD_NAME" >> "$prop_file"
-    fi
-    log_info "Set level-name from WORLD_NAME: $WORLD_NAME"
-  fi
-}
+
+# Update server.properties from .env file if it exists
 update_server_properties_from_env
 
 # Create start script using server module

@@ -93,7 +93,7 @@ source lib/validation.sh
 3. Main script entsprechend anpassen
 4. **Zeilen-Reduktion: ~400 Zeilen**
 
-### **Phase 2: Java & Server Logic** (2-3h)
+### **[x]Phase 2: Java & Server Logic** (2-3h)
 1. `lib/java.sh` erstellen
 2. `lib/server.sh` erstellen
 3. **Zeilen-Reduktion: weitere ~600 Zeilen**
