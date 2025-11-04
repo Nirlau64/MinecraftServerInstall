@@ -77,6 +77,10 @@ MAX_MEMORY_MB="${MAX_MEMORY_MB:-32768}"
 # Optional: force custom JVM args like "-Xms8G -Xmx8G"
 JAVA_ARGS="${JAVA_ARGS:-}"
 
+# Automatic backup configuration
+BACKUP_INTERVAL_HOURS="${BACKUP_INTERVAL_HOURS:-4}"
+BACKUP_RETENTION="${BACKUP_RETENTION:-12}"
+
 
 # Installation directories
 # SRVDIR: Server directory (default: current directory)
@@ -237,6 +241,12 @@ restore_world() {
 }
 # -----------------------------------------------------------------------------
 
+            --backup-interval=*)
+              BACKUP_INTERVAL_HOURS="${1#--backup-interval=}"
+              ;;
+            --backup-retention=*)
+              BACKUP_RETENTION="${1#--backup-retention=}"
+              ;;
 # Returns 0 if argument is a truthy value (yes, true, 1, etc.), else 1
 truthy() {
   case "${1:-}" in
@@ -275,6 +285,34 @@ append_file() {
   else
     printf '%s' "$*" >> "$path"
   fi
+}
+
+# Periodic backup function (runs in background)
+start_periodic_backups() {
+  local interval="$1" retention="$2" world_name="${WORLD_NAME:-world}"
+  local backup_dir="backups"
+  mkdir -p "$backup_dir"
+  (
+    while true; do
+      ts="$(date '+%Y%m%d-%H%M%S')"
+      backup_zip="$backup_dir/${world_name}-$ts.zip"
+      if [ -d "$world_name" ]; then
+        zip -rq "$backup_zip" "$world_name"
+        log_info "[AUTO-BACKUP] Backup complete: $backup_zip"
+        # Delete oldest backups if exceeding retention
+        backups=( $(ls -1t "$backup_dir/${world_name}-"*.zip 2>/dev/null) )
+        if [ "${#backups[@]}" -gt "$retention" ]; then
+          for ((i=${retention}; i<${#backups[@]}; i++)); do
+            rm -f "${backups[$i]}"
+            log_info "[AUTO-BACKUP] Deleted old backup: ${backups[$i]}"
+          done
+        fi
+      else
+        log_warn "[AUTO-BACKUP] World directory '$world_name' not found, skipping backup."
+      fi
+      sleep "$((interval*3600))"
+    done
+  ) &
 }
 
 ######################################
@@ -1419,6 +1457,39 @@ cat > start.sh <<"EOFMARKER2"
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Automatic backup configuration
+BACKUP_INTERVAL_HOURS="${BACKUP_INTERVAL_HOURS:-4}"
+BACKUP_RETENTION="${BACKUP_RETENTION:-12}"
+WORLD_NAME="${WORLD_NAME:-world}"
+
+# Periodic backup function (runs in background)
+start_periodic_backups() {
+  local interval="$1" retention="$2" world_name="$3"
+  local backup_dir="backups"
+  mkdir -p "$backup_dir"
+  (
+    while true; do
+      ts="$(date '+%Y%m%d-%H%M%S')"
+      backup_zip="$backup_dir/${world_name}-$ts.zip"
+      if [ -d "$world_name" ]; then
+        zip -rq "$backup_zip" "$world_name"
+        echo "[AUTO-BACKUP] Backup complete: $backup_zip"
+        # Delete oldest backups if exceeding retention
+        backups=( $(ls -1t "$backup_dir/${world_name}-"*.zip 2>/dev/null) )
+        if [ "${#backups[@]}" -gt "$retention" ]; then
+          for ((i=${retention}; i<${#backups[@]}; i++)); do
+            rm -f "${backups[$i]}"
+            echo "[AUTO-BACKUP] Deleted old backup: ${backups[$i]}"
+          done
+        fi
+      else
+        echo "[AUTO-BACKUP] World directory '$world_name' not found, skipping backup."
+      fi
+      sleep "$((interval*3600))"
+    done
+  ) &
+}
+
 ################################################################################
 # Funktion: detect_server_jar
 # Beschreibung: Findet die Server-JAR-Datei (Kopie aus Haupt-Script)
@@ -1452,6 +1523,9 @@ else
   # Falls nicht vorhanden, erneut erkennen
   JAR=$(detect_server_jar)
 fi
+
+# Start periodic backups in background
+start_periodic_backups "$BACKUP_INTERVAL_HOURS" "$BACKUP_RETENTION" "$WORLD_NAME"
 
 # Validiere dass JAR existiert
 if [ ! -f "$JAR" ]; then
@@ -1509,3 +1583,6 @@ chmod +x start.sh
 
 run rm -rf "$WORK" _fabric.json 2>/dev/null || true
 log_info "Install complete. Edit server.properties, then run: ./start.sh"
+
+# Start periodic backups after install (background)
+start_periodic_backups "$BACKUP_INTERVAL_HOURS" "$BACKUP_RETENTION"
