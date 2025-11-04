@@ -26,16 +26,16 @@ It supports **Forge**, **NeoForge**, **Fabric**, and **Quilt** loaders and can h
 
 ```bash
 # Basic usage with a modpack
-./universalServerSetup\ -\ Working.sh MyModpack.zip
+./universalServerSetup.sh MyModpack.zip
 
 # Non-interactive installation
-./universalServerSetup\ -\ Working.sh --yes --eula=true MyModpack.zip
+./universalServerSetup.sh --yes --eula=true MyModpack.zip
 
 # Custom RAM allocation
-./universalServerSetup\ -\ Working.sh --ram 8G MyModpack.zip
+./universalServerSetup.sh --ram 8G MyModpack.zip
 
 # With systemd service generation
-./universalServerSetup\ -\ Working.sh --systemd MyModpack.zip
+./universalServerSetup.sh --systemd MyModpack.zip
 ```
 
 ## Configuration Options
@@ -92,7 +92,7 @@ The setup script has a comprehensive CONFIG section at the top:
 
 2. **Run with a modpack:**
    ```bash
-   ./universalServerSetup\ -\ Working.sh MyModpack.zip
+   ./universalServerSetup.sh MyModpack.zip
    ```
 
 The script will automatically:
@@ -175,44 +175,44 @@ export PROP_MOTD="My Server"
 ### Interactive Installation
 ```bash
 # Standard interactive setup
-./universalServerSetup\ -\ Working.sh MyModpack.zip
+./universalServerSetup.sh MyModpack.zip
 ```
 The script will prompt for EULA acceptance and first run confirmation.
 
 ### Automated/CI Installation
 ```bash
 # Fully automated setup for CI/CD
-./universalServerSetup\ -\ Working.sh --yes --eula=true --force MyModpack.zip
+./universalServerSetup.sh --yes --eula=true --force MyModpack.zip
 
 # With custom RAM and systemd service
-./universalServerSetup\ -\ Working.sh --yes --eula=true --ram 16G --systemd MyModpack.zip
+./universalServerSetup.sh --yes --eula=true --ram 16G --systemd MyModpack.zip
 ```
 
 ### Development/Testing
 ```bash
 # Dry run to see what would happen
-./universalServerSetup\ -\ Working.sh --dry-run MyModpack.zip
+./universalServerSetup.sh --dry-run MyModpack.zip
 
 # Verbose logging for troubleshooting
-./universalServerSetup\ -\ Working.sh --verbose --log-file debug.log MyModpack.zip
+./universalServerSetup.sh --verbose --log-file debug.log MyModpack.zip
 ```
 
 ### World Management
 ```bash
 # Create backup before major changes
-./universalServerSetup\ -\ Working.sh --pre-backup --world survival MyModpack.zip
+./universalServerSetup.sh --pre-backup --world survival MyModpack.zip
 
 # Restore from backup
-./universalServerSetup\ -\ Working.sh --restore backups/survival-20241104-143022.zip
+./universalServerSetup.sh --restore backups/survival-20241104-143022.zip
 ```
 
 ### Automatic Mod Download (Experimental)
 ```bash
 # Enable automatic mod downloading (Python 3 auto-installed if needed)
-./universalServerSetup\ -\ Working.sh --auto-download-mods MyClientExport.zip
+./universalServerSetup.sh --auto-download-mods MyClientExport.zip
 
 # Combined with other options
-./universalServerSetup\ -\ Working.sh --yes --eula=true --auto-download-mods --verbose MyClientExport.zip
+./universalServerSetup.sh --yes --eula=true --auto-download-mods --verbose MyClientExport.zip
 
 # Manual download of specific mods (standalone usage)
 python3 tools/cf_downloader.py manifest.json ./mods --verbose
@@ -229,7 +229,7 @@ python3 tools/cf_downloader.py manifest.json ./mods --verbose
 ### Before Installation
 ```
 MinecraftServerInstall/
-├── universalServerSetup - Working.sh
+├── universalServerSetup.sh
 ├── MyModpack.zip
 ├── README.md
 └── ToDo.md
@@ -238,7 +238,7 @@ MinecraftServerInstall/
 ### After Installation
 ```
 MinecraftServerInstall/
-├── universalServerSetup - Working.sh
+├── universalServerSetup.sh
 ├── start.sh                     # Generated startup script
 ├── .server_functions.sh         # Shared functions
 ├── .server_jar                  # Server jar name cache
@@ -375,7 +375,7 @@ sudo yum install unzip curl jq rsync
 **Permission Issues:**
 ```bash
 # Ensure proper permissions
-chmod +x universalServerSetup\ -\ Working.sh
+chmod +x universalServerSetup.sh
 # Run with appropriate user privileges
 ```
 
@@ -437,7 +437,7 @@ git clone https://github.com/yourusername/MinecraftServerInstall.git
 cd MinecraftServerInstall
 
 # Test your changes
-./universalServerSetup\ -\ Working.sh --dry-run test-modpack.zip
+./universalServerSetup.sh --dry-run test-modpack.zip
 ```
 
 ## Support

@@ -6,7 +6,7 @@
 # It supports Forge, NeoForge, Fabric, and Quilt loaders, and can handle both server packs and client exports.
 #
 # Usage:
-#   ./universalServerSetup - Working.sh [Modpack.zip]
+#   ./universalServerSetup.sh [Modpack.zip]
 #
 # Features:
 #   - Automatic Java version detection and installation

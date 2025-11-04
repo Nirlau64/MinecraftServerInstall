@@ -3,7 +3,7 @@
 Dieses Dokument beschreibt eigenständig und vollständig die anstehenden Verbesserungen am Bash-Skript zur automatisierten Einrichtung eines modded Minecraft-Servers. Es ist ohne weitere Referenzen verständlich.
 
 Zentrale Skripte/Dateien:
-- Hauptskript: `universalServerSetup - Working.sh`
+- Hauptskript: `universalServerSetup.sh`
 - Startskript: `start.sh` (wird vom Hauptskript erzeugt/aktualisiert)
 - Optional: `tools/cf_downloader.py` (Python-Helfer für Mod-Downloads)
 
@@ -175,7 +175,7 @@ Akzeptanzkriterien:
 
 ## Artefakte & Änderungen (Ergebnis der Implementierung)
 
-- `universalServerSetup - Working.sh`: Flags, Logging, Konfig-Parsing, Backups, Integrationen.
+- `universalServerSetup.sh`: Flags, Logging, Konfig-Parsing, Backups, Integrationen.
 - `start.sh`: Einheitliche RAM/ENV-Handhabung, nutzt dieselbe Logik wie das Hauptskript.
 - `tools/cf_downloader.py` (optional): Automatischer Mod-Download.
 - `dist/minecraft.service` (optional): systemd-Unit-Template.
