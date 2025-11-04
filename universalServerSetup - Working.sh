@@ -104,8 +104,10 @@ parse_args() {
       --) shift; break ;;
       -*) log_err "Unknown option: $1"; exit 2 ;;
       *)
-        # First non-option = ZIP, unless overridden by env
-        if [ -z "${ZIP_OVERRIDE:-}" ]; then ZIP="$1"; fi
+        # Accept positional ZIP argument if not overridden
+        if [ -z "$ZIP_OVERRIDE" ] && [ -z "$ZIP" ]; then
+          ZIP="$1"
+        fi
         ;;
     esac
     shift
@@ -134,8 +136,10 @@ ask_yes_no() {
     while true; do
       read -r -p "$prompt [y/N]: " ans
       case "$ans" in
-        [Yy]|[Yy][Ee][Ss]) return 0;;
-        [Nn]|"") return 1;;
+        y|Y|yes|YES|j|J|ja|JA) return 0 ;;
+        n|N|no|NO|nein|NEIN) return 1 ;;
+        "")
+          if [ "$default" = "yes" ]; then return 0; else return 1; fi ;;
         *) echo "Bitte mit y oder n antworten.";;
       esac
     done
