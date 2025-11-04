@@ -89,6 +89,72 @@ log()       { printf '%s\n' "$*"; }
 log_info()  { printf '[INFO] %s\n' "$*"; }
 log_warn()  { printf '[WARN] %s\n' "$*" >&2; }
 log_err()   { printf '[ERROR] %s\n' "$*" >&2; }
+LOG_LEVEL="info"   # info, warn, error
+LOG_VERBOSE=1      # 0=quiet, 1=normal, 2=verbose
+LOG_FILE=""
+LOG_TTY=1
+
+# Detect TTY for color
+if [ ! -t 1 ]; then LOG_TTY=0; fi
+
+# Color codes
+CLR_RESET="\033[0m"
+CLR_INFO="\033[32m"   # green
+CLR_WARN="\033[33m"   # yellow
+CLR_ERR="\033[31m"    # red
+
+# Timestamp
+timestamp() { date '+%Y-%m-%d %H:%M:%S'; }
+
+# Logging core
+log_msg() {
+  local level="$1" msg="$2" color="" prefix="" out="";
+  case "$level" in
+    info)  color="$CLR_INFO"; prefix="INFO";;
+    warn)  color="$CLR_WARN"; prefix="WARN";;
+    error) color="$CLR_ERR"; prefix="ERROR";;
+    *)     color="$CLR_RESET"; prefix="LOG";;
+  esac
+  out="[$(timestamp)] $prefix: $msg"
+  # Console output
+  if [ "$LOG_TTY" = "1" ]; then
+    printf "%b%s%b\n" "$color" "$out" "$CLR_RESET"
+  else
+    printf "%s\n" "$out"
+  fi
+  # Log file output
+  if [ -n "$LOG_FILE" ]; then
+    printf "%s\n" "$out" >> "$LOG_FILE"
+  fi
+}
+
+log()      { log_msg info "$*"; }
+log_info() { [ "$LOG_VERBOSE" -ge 1 ] && log_msg info "$*"; }
+log_warn() { [ "$LOG_VERBOSE" -ge 0 ] && log_msg warn "$*"; }
+log_err()  { log_msg error "$*"; }
+
+# Set up log file (logs/install-YYYYmmdd-HHMMSS.log)
+setup_log_file() {
+  local logdir="logs"
+  mkdir -p "$logdir"
+  local ts
+  ts="$(date '+%Y%m%d-%H%M%S')"
+  LOG_FILE="$logdir/install-$ts.log"
+}
+
+# Parse verbosity/log flags
+for arg in "$@"; do
+  case "$arg" in
+    --verbose) LOG_VERBOSE=2 ;;
+    --quiet)   LOG_VERBOSE=0 ;;
+    --log-file)
+      shift; LOG_FILE="$1" ;;
+    --log-file=*)
+      LOG_FILE="${arg#--log-file=}" ;;
+  esac
+done
+
+setup_log_file
 
 # -----------------------------------------------------------------------------
 # Utility helpers

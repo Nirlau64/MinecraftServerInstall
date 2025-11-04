@@ -63,11 +63,10 @@ Akzeptanzkriterien:
 
 Ziel: Höhere Transparenz bei Installation, Fehlern und Warnungen.
 
-- [ ] Logger mit Zeitstempeln (`[YYYY-MM-DD HH:MM:SS] LEVEL: Nachricht`).
-- [ ] Logdatei in `logs/install-YYYYmmdd-HHMMSS.log` (Verzeichnis automatisch anlegen).
-- [ ] Farbige Konsole (grün=OK, gelb=Warn, rot=Fehler), ohne TTY automatisch deaktiviert.
-- [ ] Loggt Kernschritte: Java-Setup, Loader-Installation, Datei-Kopien, EULA, First-Run.
-- [ ] Schalter `--verbose`/`--quiet`, optional `--log-file <pfad>`.
+- [x] Logger mit Zeitstempeln (`[YYYY-MM-DD HH:MM:SS] LEVEL: Nachricht`).
+- [x] Logdatei in `logs/install-YYYYmmdd-HHMMSS.log` (Verzeichnis automatisch anlegen).
+- [x] Farbige Konsole (grün=OK, gelb=Warn, rot=Fehler), ohne TTY automatisch deaktiviert.
+- [x] Loggt Kernschritte: Java-Setup, Loader-Installation, Datei-Kopien, EULA, First-Run.
 
 Akzeptanzkriterien:
 - Bei jedem Lauf entsteht ein vollständiges Log; Fehler/Warnungen sind farblich markiert (sofern TTY).
