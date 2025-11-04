@@ -24,7 +24,7 @@ It supports **Forge**, **NeoForge**, **Fabric**, and **Quilt** loaders and can h
 
 ## Quick Start
 
-> 📖 **Für einen kompletten Workflow-Guide mit allen Möglichkeiten und Szenarien**, siehe: **[WORKFLOW_COMPLETE.md](WORKFLOW_COMPLETE.md)**
+> 📖 **For a complete workflow guide with all possibilities and scenarios**, see: **[WORKFLOW_COMPLETE.md](WORKFLOW_COMPLETE.md)**
 
 ### GUI Mode (Recommended for beginners)
 ```bash
@@ -516,14 +516,14 @@ For urgent issues, include:
 
 ---
 
-## 📚 Umfassende Dokumentation
+## 📚 Comprehensive Documentation
 
-**[→ Kompletter Workflow-Guide (WORKFLOW_COMPLETE.md)](WORKFLOW_COMPLETE.md)**
+**[→ Complete Workflow Guide (WORKFLOW_COMPLETE.md)](WORKFLOW_COMPLETE.md)**
 
-Dieser detaillierte Guide enthält:
-- ✅ Alle verfügbaren Modi (GUI, Kommandozeile, vollautomatisch)
-- ✅ Schritt-für-Schritt-Anleitungen für jeden Anwendungsfall
-- ✅ Komplette Parameterliste mit Beispielen
-- ✅ Szenarien für Anfänger bis Produktions-Server
-- ✅ Troubleshooting & Debug-Tipps
-- ✅ CI/CD-Integration und Automatisierung
+This detailed guide contains:
+- ✅ All available modes (GUI, command line, fully automated)
+- ✅ Step-by-step instructions for every use case
+- ✅ Complete parameter list with examples
+- ✅ Scenarios from beginners to production servers
+- ✅ Troubleshooting & debug tips
+- ✅ CI/CD integration and automation

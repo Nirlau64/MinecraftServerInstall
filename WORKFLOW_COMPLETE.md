@@ -1,65 +1,65 @@
-# Kompletter Minecraft Server Workflow
+# Complete Minecraft Server Workflow
 
-Diese umfassende Anleitung beschreibt alle verfügbaren Möglichkeiten zur Installation, Konfiguration und Verwaltung von Minecraft-Servern mit diesem Tool.
+This comprehensive guide describes all available options for installing, configuring, and managing Minecraft servers with this tool.
 
-## Inhaltsverzeichnis
+## Table of Contents
 
-1. [Übersicht der verfügbaren Modi](#übersicht-der-verfügbaren-modi)
-2. [Vorbereitung & Systemanforderungen](#vorbereitung--systemanforderungen)
+1. [Overview of Available Modes](#overview-of-available-modes)
+2. [Preparation & System Requirements](#preparation--system-requirements)
 3. [Installation & Setup](#installation--setup)
-   - [GUI-Modus (Empfohlen für Anfänger)](#gui-modus-empfohlen-für-anfänger)
-   - [Kommandozeilen-Modus](#kommandozeilen-modus)
-   - [Vollautomatischer Modus (CI/CD)](#vollautomatischer-modus-cicd)
-4. [Alle verfügbaren Parameter](#alle-verfügbaren-parameter)
-5. [Konfigurationsmöglichkeiten](#konfigurationsmöglichkeiten)
-6. [Szenarien & Anwendungsfälle](#szenarien--anwendungsfälle)
-7. [Nach der Installation](#nach-der-installation)
+   - [GUI Mode (Recommended for Beginners)](#gui-mode-recommended-for-beginners)
+   - [Command Line Mode](#command-line-mode)
+   - [Fully Automated Mode (CI/CD)](#fully-automated-mode-cicd)
+4. [All Available Parameters](#all-available-parameters)
+5. [Configuration Options](#configuration-options)
+6. [Scenarios & Use Cases](#scenarios--use-cases)
+7. [After Installation](#after-installation)
 8. [Troubleshooting & Logs](#troubleshooting--logs)
 
 ---
 
-## Übersicht der verfügbaren Modi
+## Overview of Available Modes
 
-### 🎮 **GUI-Modus** (Grafische Benutzeroberfläche)
-- **Zielgruppe**: Anfänger, lokale Nutzung
-- **Vorteile**: Intuitive Bedienung, visuelle Konfiguration, Live-Server-Management
-- **Nachteile**: Benötigt grafische Oberfläche
+### 🎮 **GUI Mode** (Graphical User Interface)
+- **Target Audience**: Beginners, local usage
+- **Advantages**: Intuitive operation, visual configuration, live server management
+- **Disadvantages**: Requires graphical interface
 
-### ⌨️ **Kommandozeilen-Modus** (Interaktiv)
-- **Zielgruppe**: Erfahrene Benutzer, SSH-Verbindungen
-- **Vorteile**: Flexibel, funktioniert überall
-- **Nachteile**: Erfordert Kommandozeilenkenntnisse
+### ⌨️ **Command Line Mode** (Interactive)
+- **Target Audience**: Experienced users, SSH connections
+- **Advantages**: Flexible, works everywhere
+- **Disadvantages**: Requires command line knowledge
 
-### 🤖 **Vollautomatischer Modus** (Non-Interactive)
-- **Zielgruppe**: CI/CD-Pipelines, Automatisierung
-- **Vorteile**: Keine Benutzerinteraktion erforderlich
-- **Nachteile**: Alle Parameter müssen vorab konfiguriert werden
+### 🤖 **Fully Automated Mode** (Non-Interactive)
+- **Target Audience**: CI/CD pipelines, automation
+- **Advantages**: No user interaction required
+- **Disadvantages**: All parameters must be configured in advance
 
 ---
 
-## Vorbereitung & Systemanforderungen
+## Preparation & System Requirements
 
-### Systemanforderungen
+### System Requirements
 ```bash
-# Grundlegende Tools (automatisch installiert wenn fehlend)
+# Basic tools (automatically installed if missing)
 - bash (4.0+)
 - unzip
 - curl
 - jq
 - rsync
 
-# Für GUI-Modus zusätzlich
+# For GUI mode additionally
 - Python 3.6+
-- tkinter (meist vorinstalliert)
+- tkinter (usually pre-installed)
 
-# Systemressourcen
-- Mindestens 2GB RAM (empfohlen: 4GB+)
-- 1GB freier Speicherplatz (mehr je nach Modpack)
-- Port 25565 verfügbar
-- Internetverbindung für Downloads
+# System resources
+- At least 2GB RAM (recommended: 4GB+)
+- 1GB free disk space (more depending on modpack)
+- Port 25565 available
+- Internet connection for downloads
 ```
 
-### Repository klonen
+### Clone Repository
 ```bash
 git clone https://github.com/Nirlau64/MinecraftServerInstall.git
 cd MinecraftServerInstall
@@ -71,158 +71,158 @@ chmod +x start_gui.sh
 
 ## Installation & Setup
 
-## GUI-Modus (Empfohlen für Anfänger)
+## GUI Mode (Recommended for Beginners)
 
-### 🚀 **Einfachster Weg: Komplette GUI-Installation**
+### 🚀 **Easiest Way: Complete GUI Installation**
 
 ```bash
-# GUI starten (funktioniert vor und nach Server-Setup)
+# Start GUI (works before and after server setup)
 ./start_gui.sh
 
-# Oder direkt mit Python
+# Or directly with Python
 python3 tools/server_gui.py
 ```
 
-**GUI-Workflow Schritt-für-Schritt:**
+**GUI Workflow Step-by-Step:**
 
-1. **GUI starten**
+1. **Start GUI**
    ```bash
    ./start_gui.sh
    ```
 
-2. **Setup & Konfiguration Tab verwenden**
-   - **Modpack auswählen**: Entweder ZIP-Datei auswählen oder leer lassen für Vanilla
-   - **Server-Einstellungen konfigurieren**:
-     - MOTD (Servernachricht)
-     - Schwierigkeit (Peaceful, Easy, Normal, Hard)
-     - PVP ein/aus
-     - Maximale Spieleranzahl
-     - Sichtweite, Weltname, Seed
-   - **Speicher-Einstellungen**:
-     - Automatisch (75% des System-RAM)
-     - Manuell (z.B. "8G", "4096M")
-   - **Installation-Optionen**:
-     - ✅ EULA akzeptieren
-     - ✅ Automatischer Mod-Download (für Client-Exports)
-     - ✅ Backup vor Installation
-     - ✅ Dateien überschreiben
-   - **Service-Optionen**:
-     - ✅ systemd Service generieren
-     - ✅ tmux Session starten
+2. **Use Setup & Configuration Tab**
+   - **Select Modpack**: Either choose ZIP file or leave empty for Vanilla
+   - **Configure Server Settings**:
+     - MOTD (Server message)
+     - Difficulty (Peaceful, Easy, Normal, Hard)
+     - PVP on/off
+     - Maximum player count
+     - View distance, world name, seed
+   - **Memory Settings**:
+     - Automatic (75% of system RAM)
+     - Manual (e.g. "8G", "4096M")
+   - **Installation Options**:
+     - ✅ Accept EULA
+     - ✅ Automatic mod download (for client exports)
+     - ✅ Backup before installation
+     - ✅ Overwrite files
+   - **Service Options**:
+     - ✅ Generate systemd service
+     - ✅ Start tmux session
 
-3. **Installation ausführen**
-   - Button "Server Setup ausführen" klicken
-   - Fortschritt in Echtzeit verfolgen
-   - Bei Fehlern: Logs im "Logs & Monitoring" Tab prüfen
+3. **Execute Installation**
+   - Click "Run Server Setup" button
+   - Follow progress in real-time
+   - On errors: Check logs in "Logs & Monitoring" tab
 
-4. **Server verwalten** (nach erfolgreicher Installation)
-   - **Server-Steuerung Tab**: Start/Stop/Restart/Kill
-   - **Welt-Management Tab**: Welten wechseln, Backups erstellen
-   - **Backup-Management Tab**: Backups wiederherstellen, verwalten
-   - **Mod-Management Tab**: Mods hinzufügen/entfernen
-   - **Logs & Monitoring Tab**: Server-Logs live verfolgen
+4. **Manage Server** (after successful installation)
+   - **Server Control Tab**: Start/Stop/Restart/Kill
+   - **World Management Tab**: Switch worlds, create backups
+   - **Backup Management Tab**: Restore, manage backups
+   - **Mod Management Tab**: Add/remove mods
+   - **Logs & Monitoring Tab**: Follow server logs live
 
-### GUI-spezifische Features
+### GUI-Specific Features
 
-**Live-Konsole:**
+**Live Console:**
 ```bash
-# Server-Kommandos direkt in der GUI eingeben
-say Hallo Welt!
-op SpielerName
+# Enter server commands directly in the GUI
+say Hello World!
+op PlayerName
 list
 stop
 ```
 
-**Welt-Management:**
-- Neue Welten erstellen
-- Zwischen Welten wechseln
-- Automatische Backups mit Zeitstempel
-- Welt-Import/Export
+**World Management:**
+- Create new worlds
+- Switch between worlds
+- Automatic backups with timestamp
+- World import/export
 
-**Backup-System:**
-- Automatische Backups alle X Stunden
-- Manuelle Backups auf Knopfdruck
-- Backup-Browser mit Vorschau
-- Wiederherstellung mit Bestätigung
+**Backup System:**
+- Automatic backups every X hours
+- Manual backups at the click of a button
+- Backup browser with preview
+- Restoration with confirmation
 
 ---
 
-## Kommandozeilen-Modus
+## Command Line Mode
 
-### 🎯 **Schnelle Standard-Installation**
+### 🎯 **Quick Standard Installation**
 
 ```bash
-# Einfachste Verwendung
+# Simplest usage
 ./universalServerSetup.sh MyModpack.zip
 
-# Das Skript führt Sie durch:
-# 1. Modpack-Analyse
-# 2. Java-Installation (falls erforderlich)
-# 3. EULA-Bestätigung (interaktive Eingabe)
-# 4. Server-Installation
-# 5. Erste Ausführung (optional)
-# 6. GUI-Start (optional)
+# The script will guide you through:
+# 1. Modpack analysis
+# 2. Java installation (if required)
+# 3. EULA confirmation (interactive input)
+# 4. Server installation
+# 5. First run (optional)
+# 6. GUI start (optional)
 ```
 
-### 🔧 **Mit spezifischen Parametern**
+### 🔧 **With Specific Parameters**
 
 ```bash
-# Mit benutzerdefinierten Server-Einstellungen
+# With custom server settings
 ./universalServerSetup.sh \
-  --motd="Mein Awesome Server" \
+  --motd="My Awesome Server" \
   --difficulty=hard \
   --max-players=50 \
   --pvp=false \
   --ram=8G \
   MyModpack.zip
 
-# Mit Service-Integration
+# With service integration
 ./universalServerSetup.sh \
   --systemd \
   --tmux \
   MyModpack.zip
 
-# Mit automatischem Mod-Download (für Client-Exports)
+# With automatic mod download (for client exports)
 ./universalServerSetup.sh \
   --auto-download-mods \
   --verbose \
   MyClientExport.zip
 ```
 
-### 🔄 **Erweiterte Workflows**
+### 🔄 **Advanced Workflows**
 
-**Backup & Wiederherstellung:**
+**Backup & Restoration:**
 ```bash
-# Backup vor Änderungen erstellen
+# Create backup before changes
 ./universalServerSetup.sh --pre-backup MyModpack.zip
 
-# Welt aus Backup wiederherstellen
+# Restore world from backup
 ./universalServerSetup.sh --restore backups/world-20241104-143022.zip
 
-# Mit benutzerdefiniertem Weltnamen
+# With custom world name
 ./universalServerSetup.sh --world "survival" MyModpack.zip
 ```
 
-**Entwicklung & Testing:**
+**Development & Testing:**
 ```bash
-# Dry-Run: Zeigt was passieren würde, ohne Änderungen
+# Dry-Run: Shows what would happen without making changes
 ./universalServerSetup.sh --dry-run --verbose MyModpack.zip
 
-# Mit detailliertem Logging
+# With detailed logging
 ./universalServerSetup.sh --verbose --log-file debug.log MyModpack.zip
 
-# Force-Mode: Überschreibt alle existierenden Dateien
+# Force mode: Overwrites all existing files
 ./universalServerSetup.sh --force MyModpack.zip
 ```
 
 ---
 
-## Vollautomatischer Modus (CI/CD)
+## Fully Automated Mode (CI/CD)
 
-### 🤖 **Komplette Automatisierung**
+### 🤖 **Complete Automation**
 
 ```bash
-# Vollständig automatisierte Installation
+# Fully automated installation
 ./universalServerSetup.sh \
   --yes \
   --eula=true \
@@ -236,51 +236,51 @@ stop
   MyModpack.zip
 ```
 
-### 📝 **Via Umgebungsvariablen**
+### 📝 **Via Environment Variables**
 
 ```bash
-# .env Datei erstellen
+# Create .env file
 cat > server.env << 'EOF'
-# Automatisierung
+# Automation
 AUTO_ACCEPT_EULA=yes
 AUTO_FIRST_RUN=yes
 ASSUME_YES=1
 NO_GUI=1
 
-# Server-Konfiguration
+# Server configuration
 PROP_MOTD=Production Minecraft Server
 PROP_DIFFICULTY=normal
 PROP_MAX_PLAYERS=30
 PROP_PVP=false
 PROP_VIEW_DISTANCE=12
 
-# Operator-Einstellungen
+# Operator settings
 OP_USERNAME=admin
 ALWAYS_OP_USERS="admin moderator1 moderator2"
 
-# Speicher-Konfiguration
+# Memory configuration
 MEMORY_PERCENT=80
 MIN_MEMORY_MB=4096
 MAX_MEMORY_MB=16384
 
-# Backup-Einstellungen
+# Backup settings
 BACKUP_INTERVAL_HOURS=2
 BACKUP_RETENTION=24
 
-# Service-Integration
+# Service integration
 SYSTEMD=1
 TMUX=1
 EOF
 
-# Mit Umgebungsvariablen ausführen
+# Execute with environment variables
 source server.env
 ./universalServerSetup.sh MyModpack.zip
 ```
 
-### 🐳 **Docker/Container-Integration**
+### 🐳 **Docker/Container Integration**
 
 ```bash
-# Docker-Container-freundliche Ausführung
+# Docker container-friendly execution
 docker run -v $(pwd):/workspace ubuntu:latest bash -c "
   cd /workspace
   export AUTO_ACCEPT_EULA=yes
@@ -293,203 +293,203 @@ docker run -v $(pwd):/workspace ubuntu:latest bash -c "
 
 ---
 
-## Alle verfügbaren Parameter
+## All Available Parameters
 
-### 📋 **Basis-Parameter**
+### 📋 **Basic Parameters**
 
-| Parameter | Beschreibung | Beispiel |
+| Parameter | Description | Example |
 |-----------|-------------|----------|
-| `--yes` / `-y` | Beantwortet alle Prompts mit "Ja" | `--yes` |
-| `--assume-no` | Beantwortet alle Prompts mit "Nein" | `--assume-no` |
-| `--force` | Überschreibt existierende Dateien | `--force` |
-| `--dry-run` | Zeigt Aktionen ohne Ausführung | `--dry-run` |
+| `--yes` / `-y` | Answer all prompts with "Yes" | `--yes` |
+| `--assume-no` | Answer all prompts with "No" | `--assume-no` |
+| `--force` | Overwrite existing files | `--force` |
+| `--dry-run` | Show actions without execution | `--dry-run` |
 
-### 🔐 **EULA-Parameter**
+### 🔐 **EULA Parameters**
 
-| Parameter | Beschreibung | Beispiel |
+| Parameter | Description | Example |
 |-----------|-------------|----------|
-| `--eula=true` | EULA automatisch akzeptieren | `--eula=true` |
-| `--eula=false` | EULA explizit ablehnen | `--eula=false` |
-| `--no-eula-prompt` | Überspringe EULA-Eingabeaufforderung | `--no-eula-prompt` |
+| `--eula=true` | Automatically accept EULA | `--eula=true` |
+| `--eula=false` | Explicitly reject EULA | `--eula=false` |
+| `--no-eula-prompt` | Skip EULA prompt | `--no-eula-prompt` |
 
-### 💾 **Speicher-Parameter**
+### 💾 **Memory Parameters**
 
-| Parameter | Beschreibung | Beispiel |
+| Parameter | Description | Example |
 |-----------|-------------|----------|
-| `--ram <SIZE>` | Spezifische RAM-Zuteilung | `--ram 8G`, `--ram 4096M` |
+| `--ram <SIZE>` | Specific RAM allocation | `--ram 8G`, `--ram 4096M` |
 
-### 📝 **Logging-Parameter**
+### 📝 **Logging Parameters**
 
-| Parameter | Beschreibung | Beispiel |
+| Parameter | Description | Example |
 |-----------|-------------|----------|
-| `--verbose` | Erhöht Log-Detail | `--verbose` |
-| `--quiet` | Reduziert Log-Ausgabe | `--quiet` |
-| `--log-file <path>` | Benutzerdefinierte Log-Datei | `--log-file debug.log` |
+| `--verbose` | Increase log detail | `--verbose` |
+| `--quiet` | Reduce log output | `--quiet` |
+| `--log-file <path>` | Custom log file | `--log-file debug.log` |
 
-### 🔧 **Service-Parameter**
+### 🔧 **Service Parameters**
 
-| Parameter | Beschreibung | Beispiel |
+| Parameter | Description | Example |
 |-----------|-------------|----------|
-| `--systemd` | Generiere systemd Service | `--systemd` |
-| `--tmux` | Starte in tmux Session | `--tmux` |
+| `--systemd` | Generate systemd service | `--systemd` |
+| `--tmux` | Start in tmux session | `--tmux` |
 
-### 🌍 **Welt-Parameter**
+### 🌍 **World Parameters**
 
-| Parameter | Beschreibung | Beispiel |
+| Parameter | Description | Example |
 |-----------|-------------|----------|
-| `--world <name>` | Benutzerdefinierter Weltname | `--world survival` |
-| `--pre-backup` | Backup vor Installation | `--pre-backup` |
-| `--restore <zip>` | Welt aus Backup wiederherstellen | `--restore backup.zip` |
+| `--world <name>` | Custom world name | `--world survival` |
+| `--pre-backup` | Backup before installation | `--pre-backup` |
+| `--restore <zip>` | Restore world from backup | `--restore backup.zip` |
 
-### 🎮 **Server-Properties Parameter**
+### 🎮 **Server Properties Parameters**
 
-| Parameter | Beschreibung | Werte | Beispiel |
-|-----------|-------------|-------|----------|
-| `--motd` | Server-Nachricht | Text | `--motd="Mein Server"` |
-| `--difficulty` | Schwierigkeit | peaceful, easy, normal, hard | `--difficulty=hard` |
-| `--pvp` | PVP aktiviert | true, false | `--pvp=false` |
-| `--max-players` | Maximale Spieler | Zahl | `--max-players=50` |
-| `--view-distance` | Sichtweite | 1-32 | `--view-distance=12` |
-| `--white-list` | Whitelist aktiviert | true, false | `--white-list=true` |
-| `--spawn-protection` | Spawn-Schutz-Radius | 0-29999984 | `--spawn-protection=16` |
-| `--allow-nether` | Nether erlaubt | true, false | `--allow-nether=true` |
-| `--level-name` | Weltname | Text | `--level-name=world` |
-| `--level-seed` | Welt-Seed | Zahl/Text | `--level-seed=12345` |
-| `--level-type` | Welttyp | default, flat, large_biomes | `--level-type=default` |
+| Parameter | Description | Values | Example |
+|-----------|-------------|--------|----------|
+| `--motd` | Server message | Text | `--motd="My Server"` |
+| `--difficulty` | Difficulty | peaceful, easy, normal, hard | `--difficulty=hard` |
+| `--pvp` | PVP enabled | true, false | `--pvp=false` |
+| `--max-players` | Maximum players | Number | `--max-players=50` |
+| `--view-distance` | View distance | 1-32 | `--view-distance=12` |
+| `--white-list` | Whitelist enabled | true, false | `--white-list=true` |
+| `--spawn-protection` | Spawn protection radius | 0-29999984 | `--spawn-protection=16` |
+| `--allow-nether` | Nether allowed | true, false | `--allow-nether=true` |
+| `--level-name` | World name | Text | `--level-name=world` |
+| `--level-seed` | World seed | Number/Text | `--level-seed=12345` |
+| `--level-type` | World type | default, flat, large_biomes | `--level-type=default` |
 
-### 🤖 **Mod-Download-Parameter**
+### 🤖 **Mod Download Parameters**
 
-| Parameter | Beschreibung | Beispiel |
+| Parameter | Description | Example |
 |-----------|-------------|----------|
-| `--auto-download-mods` | Automatischer Mod-Download | `--auto-download-mods` |
+| `--auto-download-mods` | Automatic mod download | `--auto-download-mods` |
 
-### 🖥️ **GUI-Parameter**
+### 🖥️ **GUI Parameters**
 
-| Parameter | Beschreibung | Beispiel |
+| Parameter | Description | Example |
 |-----------|-------------|----------|
-| `--no-gui` | GUI deaktivieren | `--no-gui` |
+| `--no-gui` | Disable GUI | `--no-gui` |
 
 ---
 
-## Konfigurationsmöglichkeiten
+## Configuration Options
 
-### 📄 **Skript-Konfiguration (Datei bearbeiten)**
+### 📄 **Script Configuration (Edit File)**
 
-Die wichtigsten Einstellungen können direkt im Skript `universalServerSetup.sh` geändert werden:
+The most important settings can be changed directly in the `universalServerSetup.sh` script:
 
 ```bash
-# Basis-Einstellungen (Zeile ~68-80)
-ZIP=""                          # Standard-Modpack-Pfad
-OP_USERNAME=""                  # Standard-Operator
-OP_LEVEL="4"                    # Operator-Level (1-4)
-ALWAYS_OP_USERS=""              # Immer-Operator-Liste
+# Basic settings (Line ~68-80)
+ZIP=""                          # Default modpack path
+OP_USERNAME=""                  # Default operator
+OP_LEVEL="4"                    # Operator level (1-4)
+ALWAYS_OP_USERS=""              # Always-operator list
 
-# Automatisierung (Zeile ~82-84)
-AUTO_ACCEPT_EULA="no"           # EULA automatisch akzeptieren
-AUTO_FIRST_RUN="no"             # Server automatisch starten
+# Automation (Line ~82-84)
+AUTO_ACCEPT_EULA="no"           # Accept EULA automatically
+AUTO_FIRST_RUN="no"             # Start server automatically
 
-# Speicher-Konfiguration (Zeile ~104-112)
-JAVA_ARGS=""                    # Benutzerdefinierte JVM-Args
-MEMORY_PERCENT=75               # RAM-Prozentsatz
+# Memory configuration (Line ~104-112)
+JAVA_ARGS=""                    # Custom JVM args
+MEMORY_PERCENT=75               # RAM percentage
 MIN_MEMORY_MB=2048              # Minimum RAM
 MAX_MEMORY_MB=32768             # Maximum RAM
 
-# Backup-Einstellungen (Zeile ~116-118)
-BACKUP_INTERVAL_HOURS=4         # Backup-Intervall
-BACKUP_RETENTION=12             # Anzahl zu behaltender Backups
+# Backup settings (Line ~116-118)
+BACKUP_INTERVAL_HOURS=4         # Backup interval
+BACKUP_RETENTION=12             # Number of backups to keep
 
-# Server-Properties-Defaults (Zeile ~129-160)
-PROP_MOTD="A Minecraft Server"  # Standard-MOTD
-PROP_DIFFICULTY="easy"          # Standard-Schwierigkeit
-PROP_PVP="true"                 # Standard-PVP
-PROP_VIEW_DISTANCE="10"         # Standard-Sichtweite
-PROP_MAX_PLAYERS="20"           # Standard-Spielerzahl
-# ... und viele weitere
+# Server properties defaults (Line ~129-160)
+PROP_MOTD="A Minecraft Server"  # Default MOTD
+PROP_DIFFICULTY="easy"          # Default difficulty
+PROP_PVP="true"                 # Default PVP
+PROP_VIEW_DISTANCE="10"         # Default view distance
+PROP_MAX_PLAYERS="20"           # Default player count
+# ... and many more
 ```
 
-### 🔄 **Umgebungsvariablen**
+### 🔄 **Environment Variables**
 
-Alle Konfigurationsoptionen können via Umgebungsvariablen überschrieben werden:
+All configuration options can be overridden via environment variables:
 
 ```bash
-# Server-Konfiguration
-export PROP_MOTD="Produktions-Server"
+# Server configuration
+export PROP_MOTD="Production Server"
 export PROP_DIFFICULTY="hard"
 export PROP_MAX_PLAYERS="100"
 export PROP_PVP="false"
 
-# Speicher-Einstellungen
+# Memory settings
 export MEMORY_PERCENT="90"
 export MIN_MEMORY_MB="8192"
 
-# Automatisierung
+# Automation
 export AUTO_ACCEPT_EULA="yes"
 export ASSUME_YES="1"
 ```
 
-### ⚙️ **Konfigurationsdateien**
+### ⚙️ **Configuration Files**
 
-Das System unterstützt auch `.env`-Dateien:
+The system also supports `.env` files:
 
 ```bash
-# .env Datei erstellen
+# Create .env file
 cat > .env << 'EOF'
-PROP_MOTD=Mein Gaming Server
+PROP_MOTD=My Gaming Server
 PROP_DIFFICULTY=normal
 PROP_MAX_PLAYERS=25
 MEMORY_PERCENT=80
 BACKUP_INTERVAL_HOURS=6
 EOF
 
-# Automatisch geladen beim Skript-Start
+# Automatically loaded at script start
 ./universalServerSetup.sh MyModpack.zip
 ```
 
 ---
 
-## Szenarien & Anwendungsfälle
+## Scenarios & Use Cases
 
-### 🎯 **Szenario 1: Anfänger - Erste Minecraft-Server**
+### 🎯 **Scenario 1: Beginners - First Minecraft Server**
 
-**Ziel**: Einfacher Start mit GUI
-**Empfohlener Workflow**: GUI-Modus
+**Goal**: Easy start with GUI
+**Recommended Workflow**: GUI Mode
 
 ```bash
-# 1. Repository klonen
+# 1. Clone repository
 git clone https://github.com/Nirlau64/MinecraftServerInstall.git
 cd MinecraftServerInstall
 
-# 2. Modpack herunterladen (von CurseForge/Modrinth)
-# MyModpack.zip in das Verzeichnis legen
+# 2. Download modpack (from CurseForge/Modrinth)
+# Place MyModpack.zip in the directory
 
-# 3. GUI starten
+# 3. Start GUI
 ./start_gui.sh
 
-# 4. In der GUI:
-#    - Setup & Konfiguration Tab öffnen
-#    - Modpack auswählen: MyModpack.zip
-#    - EULA akzeptieren
-#    - "Server Setup ausführen" klicken
-#    - Warten bis fertig
-#    - Server-Steuerung Tab nutzen
+# 4. In the GUI:
+#    - Open Setup & Configuration tab
+#    - Select modpack: MyModpack.zip
+#    - Accept EULA
+#    - Click "Run Server Setup"
+#    - Wait until finished
+#    - Use Server Control tab
 
-# 5. Server starten über GUI oder:
+# 5. Start server via GUI or:
 ./start.sh
 ```
 
-### 🏢 **Szenario 2: Produktions-Server**
+### 🏢 **Scenario 2: Production Server**
 
-**Ziel**: Stabiler Server mit Service-Integration
-**Empfohlener Workflow**: Kommandozeile mit systemd
+**Goal**: Stable server with service integration
+**Recommended Workflow**: Command line with systemd
 
 ```bash
-# 1. Vollautomatische Installation
+# 1. Fully automated installation
 ./universalServerSetup.sh \
   --yes \
   --eula=true \
   --systemd \
   --ram=16G \
-  --motd="Produktions-Server [1.20.1]" \
+  --motd="Production Server [1.20.1]" \
   --difficulty=hard \
   --max-players=50 \
   --pvp=true \
@@ -497,29 +497,29 @@ cd MinecraftServerInstall
   --backup-interval=2 \
   MyProductionModpack.zip
 
-# 2. systemd Service installieren
+# 2. Install systemd service
 sudo cp dist/minecraft.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable minecraft
 sudo systemctl start minecraft
 
-# 3. Status überwachen
+# 3. Monitor status
 sudo systemctl status minecraft
 sudo journalctl -u minecraft -f
 
-# 4. Server-Management
-sudo systemctl stop minecraft     # Stoppen
-sudo systemctl start minecraft    # Starten
-sudo systemctl restart minecraft  # Neustarten
+# 4. Server management
+sudo systemctl stop minecraft     # Stop
+sudo systemctl start minecraft    # Start
+sudo systemctl restart minecraft  # Restart
 ```
 
-### 🔄 **Szenario 3: CI/CD-Pipeline**
+### 🔄 **Scenario 3: CI/CD Pipeline**
 
-**Ziel**: Automatische Bereitstellung
-**Empfohlener Workflow**: Vollautomatisch
+**Goal**: Automatic deployment
+**Recommended Workflow**: Fully automated
 
 ```bash
-# GitHub Actions / GitLab CI Beispiel
+# GitHub Actions / GitLab CI Example
 name: Deploy Minecraft Server
 on:
   push:
@@ -533,37 +533,37 @@ jobs:
     
     - name: Deploy Server
       run: |
-        # Umgebungsvariablen setzen
+        # Set environment variables
         export AUTO_ACCEPT_EULA=yes
         export AUTO_FIRST_RUN=no
         export NO_GUI=1
         export ASSUME_YES=1
         export SYSTEMD=1
         
-        # Server installieren
+        # Install server
         ./universalServerSetup.sh \
           --force \
           --ram=8G \
           --motd="CI/CD Server $(date)" \
           ModpackLatest.zip
         
-        # Service starten
+        # Start service
         sudo systemctl restart minecraft
 ```
 
-### 🧪 **Szenario 4: Entwicklung & Testing**
+### 🧪 **Scenario 4: Development & Testing**
 
-**Ziel**: Schnelle Test-Server für Mod-Entwicklung
-**Empfohlener Workflow**: Dry-Run + Development-Mode
+**Goal**: Quick test servers for mod development
+**Recommended Workflow**: Dry-Run + Development Mode
 
 ```bash
-# 1. Test-Setup ohne echte Installation
+# 1. Test setup without actual installation
 ./universalServerSetup.sh \
   --dry-run \
   --verbose \
   TestModpack.zip
 
-# 2. Entwicklungs-Server mit Debug-Logging
+# 2. Development server with debug logging
 ./universalServerSetup.sh \
   --yes \
   --eula=true \
@@ -574,26 +574,26 @@ jobs:
   --motd="Dev Server - $(date +%Y%m%d)" \
   TestModpack.zip
 
-# 3. Schnelle Iteration
-# Modpack ändern und neu installieren
+# 3. Quick iteration
+# Change modpack and reinstall
 ./universalServerSetup.sh \
   --force \
   --yes \
   --eula=true \
   TestModpack-v2.zip
 
-# 4. tmux Session verwalten
-tmux attach-session -t minecraft  # An Server anhängen
-# Strg+B, D zum Trennen
+# 4. Manage tmux session
+tmux attach-session -t minecraft  # Attach to server
+# Ctrl+B, D to detach
 ```
 
-### 🌐 **Szenario 5: Multi-Server-Setup**
+### 🌐 **Scenario 5: Multi-Server Setup**
 
-**Ziel**: Mehrere Server auf einem System
-**Empfohlener Workflow**: Separate Verzeichnisse
+**Goal**: Multiple servers on one system
+**Recommended Workflow**: Separate directories
 
 ```bash
-# 1. Basis-Setup
+# 1. Basic setup
 mkdir -p ~/minecraft-servers
 cd ~/minecraft-servers
 
@@ -606,13 +606,13 @@ cd survival-server
   --ram=8G \
   --systemd \
   SurvivalModpack.zip
-# Service-Namen ändern: minecraft-survival
+# Change service name: minecraft-survival
 
 # 3. Server 2: Creative  
 cd ~/minecraft-servers
 git clone https://github.com/Nirlau64/MinecraftServerInstall.git creative-server
 cd creative-server
-# Port ändern in server.properties auf 25566
+# Change port in server.properties to 25566
 ./universalServerSetup.sh \
   --motd="Creative Server" \
   --difficulty=peaceful \
@@ -623,7 +623,7 @@ cd creative-server
 cd ~/minecraft-servers
 git clone https://github.com/Nirlau64/MinecraftServerInstall.git modded-server
 cd modded-server
-# Port ändern auf 25567
+# Change port to 25567
 ./universalServerSetup.sh \
   --motd="Modded Server" \
   --auto-download-mods \
@@ -631,17 +631,17 @@ cd modded-server
   HeavyModpack.zip
 ```
 
-### 🔁 **Szenario 6: Server-Migration & Backup**
+### 🔁 **Scenario 6: Server Migration & Backup**
 
-**Ziel**: Bestehenden Server migrieren oder wiederherstellen
-**Empfohlener Workflow**: Backup-System nutzen
+**Goal**: Migrate existing server or restore
+**Recommended Workflow**: Use backup system
 
 ```bash
-# 1. Backup vom alten Server erstellen
-# (falls mit diesem Tool erstellt)
+# 1. Create backup from old server
+# (if created with this tool)
 ./universalServerSetup.sh --pre-backup
 
-# oder manuell
+# or manually
 zip -r server-backup-$(date +%Y%m%d).zip \
   world* \
   server.properties \
@@ -650,271 +650,271 @@ zip -r server-backup-$(date +%Y%m%d).zip \
   mods/ \
   config/
 
-# 2. Neuen Server installieren
+# 2. Install new server
 ./universalServerSetup.sh MyModpack.zip
 
-# 3. Backup wiederherstellen
+# 3. Restore backup
 ./universalServerSetup.sh --restore server-backup-20241104.zip
 
-# 4. Oder selektive Wiederherstellung
+# 4. Or selective restoration
 unzip -j server-backup-20241104.zip world/* -d world/
 unzip -j server-backup-20241104.zip server.properties
 ```
 
 ---
 
-## Nach der Installation
+## After Installation
 
-### 📁 **Generierte Dateien verstehen**
+### 📁 **Understanding Generated Files**
 
-Nach erfolgreicher Installation entsteht folgende Struktur:
+After successful installation, the following structure is created:
 
 ```
 MinecraftServerInstall/
-├── universalServerSetup.sh     # Setup-Skript
-├── start.sh                    # Server-Start-Skript ⭐
-├── .server_functions.sh        # Interne Funktionen
-├── .server_jar                 # Server-JAR-Cache
-├── eula.txt                    # EULA-Akzeptierung
-├── server.properties           # Server-Konfiguration ⭐
-├── ops.json                    # Operator-Liste
-├── whitelist.json             # Whitelist (falls aktiviert)
-├── mods/                      # Mod-Dateien
+├── universalServerSetup.sh     # Setup script
+├── start.sh                    # Server start script ⭐
+├── .server_functions.sh        # Internal functions
+├── .server_jar                 # Server JAR cache
+├── eula.txt                    # EULA acceptance
+├── server.properties           # Server configuration ⭐
+├── ops.json                    # Operator list
+├── whitelist.json             # Whitelist (if enabled)
+├── mods/                      # Mod files
 │   ├── mod1.jar
 │   └── mod2.jar
-├── config/                    # Mod-Konfigurationen
+├── config/                    # Mod configurations
 │   ├── forge-common.toml
-│   └── verschiedene-mod-configs/
-├── logs/                      # Log-Dateien ⭐
+│   └── various-mod-configs/
+├── logs/                      # Log files ⭐
 │   ├── install-20241104-143022.log
 │   ├── latest.log
 │   └── missing-mods.txt
-├── backups/                   # Automatische Backups ⭐
+├── backups/                   # Automatic backups ⭐
 │   └── world-20241104-120000.zip
-├── world/                     # Spielwelt ⭐
-├── libraries/                 # Mod-Loader-Libraries
-├── forge-xx.x.x.jar          # Server-JAR (Forge/Fabric/etc.)
-└── dist/                      # Service-Dateien
-    └── minecraft.service      # systemd Service
+├── world/                     # Game world ⭐
+├── libraries/                 # Mod loader libraries
+├── forge-xx.x.x.jar          # Server JAR (Forge/Fabric/etc.)
+└── dist/                      # Service files
+    └── minecraft.service      # systemd service
 ```
 
-### 🎮 **Server-Management nach Installation**
+### 🎮 **Server Management After Installation**
 
-**Server starten:**
+**Starting the server:**
 ```bash
-# Via generiertem Startskript (empfohlen)
+# Via generated startup script (recommended)
 ./start.sh
 
-# Via systemd (falls --systemd verwendet)
+# Via systemd (if --systemd was used)
 sudo systemctl start minecraft
 
-# Via tmux (falls --tmux verwendet)
+# Via tmux (if --tmux was used)
 tmux attach-session -t minecraft
 
 # Via GUI
 ./start_gui.sh
-# → Server-Steuerung Tab → Start-Button
+# → Server Control Tab → Start Button
 ```
 
-**Server stoppen:**
+**Stopping the server:**
 ```bash
-# Graceful shutdown (in der Server-Konsole)
+# Graceful shutdown (in server console)
 stop
 
 # Via systemd
 sudo systemctl stop minecraft
 
-# Force kill (Notfall)
+# Force kill (emergency)
 pkill -f minecraft
 ```
 
-**Server-Konfiguration ändern:**
+**Changing server configuration:**
 ```bash
-# server.properties bearbeiten
+# Edit server.properties
 nano server.properties
 
-# Mod-Konfigurationen
+# Mod configurations
 nano config/forge-common.toml
 
-# Via GUI: Setup & Konfiguration Tab
+# Via GUI: Setup & Configuration Tab
 ```
 
-### 🔧 **Wartung & Updates**
+### 🔧 **Maintenance & Updates**
 
-**Modpack updaten:**
+**Update modpack:**
 ```bash
-# Backup erstellen
+# Create backup
 ./universalServerSetup.sh --pre-backup
 
-# Neues Modpack installieren
+# Install new modpack
 ./universalServerSetup.sh --force NewModpackVersion.zip
 
-# Bei Problemen: Backup wiederherstellen
+# On problems: Restore backup
 ./universalServerSetup.sh --restore backups/world-YYYYMMDD-HHMMSS.zip
 ```
 
-**Einzelne Mods hinzufügen:**
+**Add individual mods:**
 ```bash
-# Mod-Datei in mods/ Verzeichnis kopieren
+# Copy mod file to mods/ directory
 cp NewMod.jar mods/
 
-# Server neustarten
+# Restart server
 ./start.sh
 ```
 
-**Backup-Management:**
+**Backup management:**
 ```bash
-# Manuelles Backup
+# Manual backup
 zip -r "backup-$(date +%Y%m%d-%H%M%S).zip" world/
 
-# Automatische Backups konfigurieren (im Skript)
-BACKUP_INTERVAL_HOURS=2  # Alle 2 Stunden
-BACKUP_RETENTION=24      # 24 Backups behalten
+# Configure automatic backups (in script)
+BACKUP_INTERVAL_HOURS=2  # Every 2 hours
+BACKUP_RETENTION=24      # Keep 24 backups
 
-# Alte Backups aufräumen
-find backups/ -name "*.zip" -mtime +7 -delete  # Älter als 7 Tage
+# Clean up old backups
+find backups/ -name "*.zip" -mtime +7 -delete  # Older than 7 days
 ```
 
 ---
 
 ## Troubleshooting & Logs
 
-### 📊 **Log-Dateien verstehen**
+### 📊 **Understanding Log Files**
 
-**Installation-Logs:**
+**Installation logs:**
 ```bash
-# Neuestes Installation-Log
+# Latest installation log
 ls -t logs/install-*.log | head -1
 
-# Log anzeigen
+# View log
 cat logs/install-20241104-143022.log
 
-# Fehlerfiltere Log
+# Filter errors from log
 grep -i error logs/install-20241104-143022.log
 ```
 
-**Server-Logs:**
+**Server logs:**
 ```bash
-# Aktuelle Server-Logs
+# Current server logs
 tail -f logs/latest.log
 
-# Bestimmte Events suchen
+# Search for specific events
 grep -i "player\|error\|warn" logs/latest.log
 
-# Crash-Reports
+# Crash reports
 ls -la crash-reports/
 ```
 
-**Mod-Download-Logs (bei --auto-download-mods):**
+**Mod download logs (with --auto-download-mods):**
 ```bash
-# Fehlgeschlagene Downloads
+# Failed downloads
 cat logs/missing-mods.txt
 
-# Manuell herunterladen
+# Download manually
 python3 tools/cf_downloader.py manifest.json ./mods --verbose
 ```
 
-### 🚨 **Häufige Probleme & Lösungen**
+### 🚨 **Common Problems & Solutions**
 
-**Problem: Java nicht gefunden**
+**Problem: Java not found**
 ```bash
-# Java-Version prüfen
+# Check Java version
 java -version
 
-# Manuell Java installieren (Ubuntu/Debian)
+# Manually install Java (Ubuntu/Debian)
 sudo apt update
 sudo apt install openjdk-17-jre-headless
 
-# Für ältere Minecraft-Versionen
+# For older Minecraft versions
 sudo apt install openjdk-8-jre-headless
 
-# Für neueste Minecraft-Versionen
+# For latest Minecraft versions
 sudo apt install openjdk-21-jre-headless
 ```
 
-**Problem: Port 25565 bereits belegt**
+**Problem: Port 25565 already in use**
 ```bash
-# Port-Nutzung prüfen
+# Check port usage
 sudo ss -tlnp | grep :25565
 sudo netstat -tlnp | grep :25565
 
-# Prozess beenden
+# Kill process
 sudo kill $(sudo lsof -t -i:25565)
 
-# Alternativen Port verwenden (server.properties)
+# Use alternative port (server.properties)
 server-port=25566
 ```
 
-**Problem: Nicht genügend Speicher**
+**Problem: Not enough memory**
 ```bash
-# Verfügbaren RAM prüfen
+# Check available RAM
 free -h
 
-# Speicher-Einstellungen anpassen
+# Adjust memory settings
 ./universalServerSetup.sh --ram 4G MyModpack.zip
 
-# Oder in der Konfiguration
+# Or in configuration
 export MEMORY_PERCENT=50
 ```
 
-**Problem: Fehlende Berechtigung**
+**Problem: Missing permissions**
 ```bash
-# Berechtigungen setzen
+# Set permissions
 chmod +x universalServerSetup.sh start.sh
 
-# Besitzer ändern
+# Change owner
 sudo chown -R $USER:$USER .
 
-# Für systemd Service
+# For systemd service
 sudo chown root:root dist/minecraft.service
 ```
 
-**Problem: GUI startet nicht**
+**Problem: GUI won't start**
 ```bash
-# tkinter Installation prüfen
+# Check tkinter installation
 python3 -c "import tkinter; print('OK')"
 
-# Bei Headless-Server: X11-Forwarding
+# For headless server: X11 forwarding
 ssh -X user@server
 
-# Oder GUI deaktivieren
+# Or disable GUI
 ./universalServerSetup.sh --no-gui MyModpack.zip
 ```
 
-**Problem: Mods nicht kompatibel**
+**Problem: Mods not compatible**
 ```bash
-# Mod-Kompatibilität prüfen
-cat mods/mod-name.jar # Minecraft-Version im Namen
+# Check mod compatibility
+cat mods/mod-name.jar # Minecraft version in name
 
-# manifest.json analysieren (bei Client-Exports)
+# Analyze manifest.json (for client exports)
 cat manifest.json | jq '.minecraft.version'
 cat manifest.json | jq '.minecraft.modLoaders'
 
-# Einzelne problematische Mods entfernen
+# Remove individual problematic mods
 mv mods/problematic-mod.jar mods/disabled/
 ```
 
-### 🔍 **Debug-Modi verwenden**
+### 🔍 **Using Debug Modes**
 
 **Verbose Logging:**
 ```bash
-# Detaillierte Ausgabe
+# Detailed output
 ./universalServerSetup.sh --verbose MyModpack.zip
 
-# Mit Log-Datei
+# With log file
 ./universalServerSetup.sh --verbose --log-file debug.log MyModpack.zip
 
-# Log analysieren
+# Analyze log
 less debug.log
-grep -C 3 -i error debug.log  # 3 Zeilen Kontext um Fehler
+grep -C 3 -i error debug.log  # 3 lines context around errors
 ```
 
-**Dry-Run für Tests:**
+**Dry-Run for Testing:**
 ```bash
-# Zeigt alle Aktionen ohne Ausführung
+# Shows all actions without execution
 ./universalServerSetup.sh --dry-run --verbose MyModpack.zip
 
-# Perfekt zum Testen von Parametern
+# Perfect for testing parameters
 ./universalServerSetup.sh --dry-run \
   --ram 16G \
   --systemd \
@@ -922,60 +922,60 @@ grep -C 3 -i error debug.log  # 3 Zeilen Kontext um Fehler
   MyModpack.zip
 ```
 
-**Schritt-für-Schritt-Debugging:**
+**Step-by-Step Debugging:**
 ```bash
-# 1. Modpack validieren
+# 1. Validate modpack
 unzip -t MyModpack.zip
 
-# 2. Manifest analysieren (falls vorhanden)
+# 2. Analyze manifest (if present)
 unzip -p MyModpack.zip manifest.json | jq .
 
-# 3. Java-Version für Minecraft-Version prüfen
-# (wird automatisch vom Skript gemacht)
+# 3. Check Java version for Minecraft version
+# (done automatically by script)
 
-# 4. Verfügbare Ressourcen prüfen
-df -h        # Speicherplatz
+# 4. Check available resources
+df -h        # Disk space
 free -h      # RAM
-ss -tlnp | grep :25565  # Port-Verfügbarkeit
+ss -tlnp | grep :25565  # Port availability
 ```
 
-### 📞 **Hilfe erhalten**
+### 📞 **Getting Help**
 
 **Community & Support:**
-- GitHub Issues: Detaillierte Bug-Reports mit Logs
-- GitHub Discussions: Allgemeine Fragen und Tipps
-- README.md: Grundlegende Dokumentation
+- GitHub Issues: Detailed bug reports with logs
+- GitHub Discussions: General questions and tips
+- README.md: Basic documentation
 
-**Hilfreiche Informationen für Support-Anfragen:**
+**Helpful information for support requests:**
 ```bash
-# System-Informationen sammeln
-uname -a                    # System-Info
-java -version              # Java-Version  
-python3 --version          # Python-Version
+# Gather system information
+uname -a                    # System info
+java -version              # Java version  
+python3 --version          # Python version
 cat /etc/os-release        # Distribution
 
-# Log-Dateien bereitstellen
+# Provide log files
 tar -czf support-logs.tar.gz logs/ *.log server.properties
 
-# Konfiguration teilen (ohne sensible Daten)
+# Share configuration (without sensitive data)
 grep -v "password\|key\|token" universalServerSetup.sh | head -200
 ```
 
 ---
 
-## Fazit
+## Conclusion
 
-Dieses umfassende Tool bietet drei verschiedene Ansätze für jeden Nutzertyp:
+This comprehensive tool offers three different approaches for every user type:
 
-- **🎮 GUI-Modus**: Perfekt für Einsteiger und visuelle Verwaltung
-- **⌨️ Kommandozeile**: Flexibel für erfahrene Nutzer und SSH-Umgebungen  
-- **🤖 Vollautomatisch**: Ideal für Automatisierung und CI/CD-Pipelines
+- **🎮 GUI Mode**: Perfect for beginners and visual management
+- **⌨️ Command Line**: Flexible for experienced users and SSH environments  
+- **🤖 Fully Automated**: Ideal for automation and CI/CD pipelines
 
-Mit über 30 Konfigurationsparametern, automatischem Java-Management, intelligentem Backup-System und umfassendem Logging ist es für jeden Anwendungsfall gerüstet - vom ersten Minecraft-Server bis zur Produktions-Umgebung mit mehreren Servern.
+With over 30 configuration parameters, automatic Java management, intelligent backup system, and comprehensive logging, it's equipped for every use case - from the first Minecraft server to production environments with multiple servers.
 
-**Wichtigste Empfehlungen:**
-- Neue Nutzer: Beginnen Sie mit dem GUI-Modus
-- Produktions-Server: Nutzen Sie `--systemd` für Service-Integration  
-- Entwicklung: Verwenden Sie `--dry-run` zum Testen
-- Automatisierung: Konfigurieren Sie Umgebungsvariablen
-- Immer: Erstellen Sie regelmäßige Backups!
+**Key Recommendations:**
+- New users: Start with GUI mode
+- Production servers: Use `--systemd` for service integration  
+- Development: Use `--dry-run` for testing
+- Automation: Configure environment variables
+- Always: Create regular backups!
