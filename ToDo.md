@@ -220,27 +220,42 @@ Akzeptanzkriterien:
 
 ---
 
-## 9) Optionale GUI zur Serververwaltung
+## 9) Optionale GUI zur Serververwaltung ✅
 
 Ziel: Eine kleine, optionale (standardmäßig aktivierte) grafische Oberfläche zur Verwaltung des Servers nach dem Start (Welten, Backups, Logs, Start/Stop, etc.).
 
-- [ ] GUI-Framework auswählen (z. B. Python/PyQt, Electron, GTK, Tkinter)
-- [ ] Integration als separater Prozess, der nach dem Setup automatisch startet (deaktivierbar per Flag/ENV)
-- [ ] Features:
-  - [ ] Weltverwaltung (Wechseln, Erstellen, Löschen)
-  - [ ] Backups (Erstellen, Wiederherstellen, Listen anzeigen)
-  - [ ] Server-Start/Stop/Restart
-  - [ ] Log-Viewer (install.log, missing-mods.txt, server.log)
-  - [ ] Mod-Übersicht (Anzeige, ggf. Download/Update)
-  - [ ] Anzeige von Serverstatus und Ressourcenverbrauch
-- [ ] Kommunikation mit Server über Shell-Kommandos, Dateien und ggf. tmux/systemd
-- [ ] Headless-Erkennung: GUI startet nur, wenn Display verfügbar ist
-- [ ] Konfigurierbarkeit: Standardmäßig aktiv, aber per Flag/ENV deaktivierbar (z. B. `--no-gui`, `GUI=0`)
-- [ ] Dokumentation und Beispiele für GUI-Nutzung ergänzen
+- [x] GUI-Framework auswählen: **Python/Tkinter** (lightweight, keine zusätzlichen Installationen)
+- [x] Integration als separater Prozess, der nach dem Setup automatisch startet (deaktivierbar per Flag/ENV)
+- [x] **Vollständige Server-Setup-Konfiguration:** GUI ermöglicht Änderung aller Setup-Parameter und Startparameter
+- [x] Features:
+  - [x] **Server Setup & Konfiguration:** Vollständige GUI für alle Setup-Parameter (server.properties, Speicher, EULA, etc.)
+  - [x] **Server-Steuerung:** Start/Stop/Restart/Force Kill mit Konsolen-Integration
+  - [x] **Weltverwaltung:** Wechseln, Backup erstellen, Löschen, Liste verfügbarer Welten
+  - [x] **Backup-Management:** Erstellen, Wiederherstellen, Löschen, Import von externen Backups
+  - [x] **Log-Viewer:** Anzeige aller Logs (install.log, missing-mods.txt, server.log, etc.)
+  - [x] **Mod-Management:** Anzeige installierter Mods, Hinzufügen/Entfernen, Auto-Download aus manifest.json
+  - [x] **Echtzeit-Serverstatus:** Status-Monitoring und Ressourcenverbrauch
+  - [x] **Konfigurationsverwaltung:** Speichern/Laden von Konfigurationen, Reset zu Defaults
+- [x] Kommunikation mit Server über Shell-Kommandos und Dateien
+- [x] Headless-Erkennung: GUI startet nur, wenn Display verfügbar ist
+- [x] Konfigurierbarkeit: Standardmäßig aktiv, aber per `--no-gui`/`GUI=0` deaktivierbar
+- [x] Robuste Fehlerbehandlung und automatisches Cleanup bei Skript-Abbruch
 
-Akzeptanzkriterien:
-- Nach dem Setup ist die GUI verfügbar und kann die wichtigsten Verwaltungsaufgaben ausführen
+**Implementierte GUI-Features:**
+- **Tab-basierte Oberfläche** mit 5 Hauptbereichen:
+  1. **Setup & Konfiguration:** Vollständige Konfiguration aller Server-Parameter
+  2. **Server-Steuerung:** Live-Konsole mit Befehls-Input und Ausgabe
+  3. **Welt-Management:** Verwaltung von Welten und Backups
+  4. **Mod-Management:** Übersicht und Verwaltung installierter Mods
+  5. **Logs & Monitoring:** Log-Viewer mit verschiedenen Log-Dateien
+- **Konfigurationsspeicherung:** Einstellungen werden in .env-Dateien gespeichert
+- **Robuste Integration:** Automatischer Start nach Setup, Cleanup bei Fehlern
+- **Cross-Platform:** Funktioniert auf Linux, macOS und Windows
+
+Akzeptanzkriterien: ✅
+- Nach dem Setup ist die GUI verfügbar und kann alle Verwaltungsaufgaben ausführen
 - GUI ist optional und kann für reine Server-/CI-Nutzung deaktiviert werden
+- **Zusätzlich:** GUI ermöglicht vollständige Rekonfiguration des Servers ohne Kommandozeile
 
 ---
 

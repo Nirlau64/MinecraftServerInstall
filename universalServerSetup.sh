@@ -44,6 +44,12 @@ cleanup_on_exit() {
     cleanup_python3_if_installed
   fi
   
+  # Clean up GUI if it was started during an error
+  if [ $exit_code -ne 0 ] && [ -f ".gui_pid" ]; then
+    echo "[INFO] Stopping GUI due to script error..."
+    stop_gui 2>/dev/null || true
+  fi
+  
   # Log cleanup completion
   if [ $exit_code -ne 0 ]; then
     log_warn "Script exited with error code $exit_code"
@@ -290,6 +296,10 @@ SYSTEMD=0
 TMUX=0
 AUTO_DOWNLOAD_MODS=0
 PYTHON3_INSTALLED_BY_SCRIPT=0  # Flag to track if we installed Python 3
+
+# GUI options
+GUI=1  # Enable GUI by default
+NO_GUI=0
 
 # -----------------------------------------------------------------------------
 # Logging helpers
@@ -610,6 +620,10 @@ OPTIONS:
   Mods:
     --auto-download-mods     Auto-download mods from manifest.json
     
+  GUI:
+    --gui                    Enable GUI after setup (default)
+    --no-gui                 Disable GUI (for headless servers)
+    
   Misc:
     --help                   Show this help message
     
@@ -617,6 +631,7 @@ ENVIRONMENT VARIABLES:
     AUTO_YES=1               Same as --yes
     EULA=true|false          Same as --eula
     RAM=SIZE                 Same as --ram SIZE
+    GUI=0                    Same as --no-gui
     
 EXAMPLES:
     # Interactive installation
@@ -698,6 +713,14 @@ parse_args() {
       --auto-download-mods)
         AUTO_DOWNLOAD_MODS=1
         ;;
+      --gui)
+        GUI=1
+        NO_GUI=0
+        ;;
+      --no-gui)
+        GUI=0
+        NO_GUI=1
+        ;;
       --backup-interval=*)
         BACKUP_INTERVAL_HOURS="${1#--backup-interval=}"
         ;;
@@ -726,6 +749,7 @@ parse_args() {
 # ENV fallbacks
 [ -n "${AUTO_YES:-}" ] && truthy "$AUTO_YES" && ASSUME_YES=1
 [ -n "${EULA:-}" ] && EULA_VALUE="${EULA}"
+[ -n "${GUI:-}" ] && ! truthy "$GUI" && NO_GUI=1
 
 # Parse CLI args now
 parse_args "$@"
@@ -1178,6 +1202,96 @@ cleanup_python3_if_installed() {
   fi
   
   PYTHON3_INSTALLED_BY_SCRIPT=0
+}
+
+# -----------------------------------------------------------------------------
+# GUI Management Functions
+# -----------------------------------------------------------------------------
+
+# Function: start_gui_if_enabled
+# Description: Starts the server management GUI if enabled and conditions are met
+start_gui_if_enabled() {
+  # Skip if GUI is disabled
+  if [ "$NO_GUI" = "1" ] || [ "$GUI" = "0" ]; then
+    log_info "GUI disabled, skipping GUI startup"
+    return 0
+  fi
+  
+  # Skip if no display available (headless server)
+  if [ -z "${DISPLAY:-}" ] && [ "$OS" != "Windows_NT" ]; then
+    log_info "No display available, GUI disabled for headless environment"
+    return 0
+  fi
+  
+  # Check if Python 3 is available
+  local python_cmd=""
+  if command -v python3 >/dev/null 2>&1; then
+    python_cmd="python3"
+  elif command -v python >/dev/null 2>&1 && python --version 2>&1 | grep -q "Python 3"; then
+    python_cmd="python"
+  else
+    log_warn "Python 3 not available, GUI disabled"
+    log_info "To enable GUI, install Python 3: sudo apt-get install python3 (or equivalent for your system)"
+    return 0
+  fi
+  
+  # Check if tkinter is available
+  if ! $python_cmd -c "import tkinter" 2>/dev/null; then
+    log_warn "tkinter not available, GUI disabled"
+    log_info "To enable GUI, install tkinter: sudo apt-get install python3-tk (or equivalent for your system)"
+    return 0
+  fi
+  
+  # Check if GUI script exists
+  local gui_script="tools/server_gui.py"
+  if [ ! -f "$gui_script" ]; then
+    log_warn "GUI script not found: $gui_script"
+    return 0
+  fi
+  
+  log_info "Starting Server Management GUI..."
+  
+  # Start GUI in background
+  if [ "$DRY_RUN" = "1" ]; then
+    log_info "[DRY-RUN] would start GUI: $python_cmd $gui_script $(pwd)"
+    return 0
+  fi
+  
+  # Start GUI with current directory as server directory
+  nohup $python_cmd "$gui_script" "$(pwd)" >/dev/null 2>&1 &
+  local gui_pid=$!
+  
+  # Give GUI a moment to start
+  sleep 2
+  
+  # Check if GUI is still running
+  if kill -0 $gui_pid 2>/dev/null; then
+    log_info "GUI started successfully (PID: $gui_pid)"
+    log_info "You can now manage your server through the graphical interface"
+    
+    # Save GUI PID for potential cleanup
+    echo "$gui_pid" > .gui_pid 2>/dev/null || true
+  else
+    log_warn "GUI failed to start or exited immediately"
+    log_info "You can manually start the GUI with: $python_cmd $gui_script"
+  fi
+}
+
+# Function: stop_gui
+# Description: Stops the GUI if it's running
+stop_gui() {
+  if [ -f ".gui_pid" ]; then
+    local gui_pid
+    gui_pid=$(cat .gui_pid)
+    if kill -0 "$gui_pid" 2>/dev/null; then
+      log_info "Stopping GUI (PID: $gui_pid)..."
+      kill "$gui_pid" 2>/dev/null || true
+      sleep 1
+      # Force kill if still running
+      kill -9 "$gui_pid" 2>/dev/null || true
+    fi
+    rm -f .gui_pid
+  fi
 }
 
 # Detect system memory and return appropriate JVM args (configurable percent of system RAM)
@@ -2002,3 +2116,16 @@ run rm -rf "$WORK" _fabric.json 2>/dev/null || true
 cleanup_python3_if_installed
 
 log_info "Install complete. Edit server.properties, then run: ./start.sh"
+
+# Start GUI if enabled and conditions are met
+start_gui_if_enabled
+
+log_info "Setup complete!"
+log_info ""
+log_info "Available commands:"
+log_info "  ./start.sh                    - Start the server"
+log_info "  python3 tools/server_gui.py   - Start management GUI"
+if [ "$SYSTEMD" = "1" ] && [ -f "dist/minecraft.service" ]; then
+  log_info "  sudo cp dist/minecraft.service /etc/systemd/system/"
+  log_info "  sudo systemctl enable --now minecraft.service"
+fi
