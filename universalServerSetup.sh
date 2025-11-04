@@ -25,6 +25,17 @@
 
 set -euo pipefail
 
+# -----------------------------------------------------------------------------
+# MODULE LOADING
+# -----------------------------------------------------------------------------
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load core modules
+source "$SCRIPT_DIR/lib/core.sh"
+source "$SCRIPT_DIR/lib/logging.sh" 
+source "$SCRIPT_DIR/lib/validation.sh"
+
 # Trap to ensure Python 3 cleanup on exit
 cleanup_on_exit() {
   local exit_code=$?
@@ -124,145 +135,9 @@ SRVDIR="${SRVDIR:-$(pwd)}"
 WORK="${WORK:-${SRVDIR}/_work}"
 
 # -----------------------------------------------------------------------------
-# EXIT CODES (Consistent error handling)
+# PRE-FLIGHT CHECKS (Now handled by validation.sh module)
 # -----------------------------------------------------------------------------
-readonly EXIT_SUCCESS=0
-readonly EXIT_GENERAL=1
-readonly EXIT_PREREQ=2
-readonly EXIT_DOWNLOAD=3
-readonly EXIT_INSTALL=4
-readonly EXIT_EULA=5
-readonly EXIT_START=6
-
-# -----------------------------------------------------------------------------
-# PRE-FLIGHT CHECKS
-# -----------------------------------------------------------------------------
-
-# Function: check_disk_space
-# Description: Checks if there's enough free disk space (minimum 2GB recommended)
-# Returns: 0 if OK, exits with EXIT_PREREQ if insufficient space
-check_disk_space() {
-  local min_space_mb=2048
-  local available_mb
-  
-  if command -v df >/dev/null 2>&1; then
-    # Get available space in MB - try different df formats
-    if df -BM . >/dev/null 2>&1; then
-      # GNU df with block size
-      available_mb=$(df -BM . | awk 'NR==2 {gsub(/M/, "", $4); print int($4)}')
-    elif df -m . >/dev/null 2>&1; then
-      # Some systems use -m for MB
-      available_mb=$(df -m . | awk 'NR==2 {print int($4)}')
-    elif df -Pm . >/dev/null 2>&1; then
-      # POSIX-style df
-      available_mb=$(df -Pm . | awk 'NR==2 {print $4}')
-    else
-      # Fallback: assume 1K blocks and convert to MB
-      available_mb=$(df . 2>/dev/null | awk 'NR==2 {print int($4/1024)}')
-    fi
-    
-    if [ "$available_mb" -lt "$min_space_mb" ]; then
-      log_err "Insufficient disk space: ${available_mb}MB available, ${min_space_mb}MB required"
-      log_err "Please free up some disk space and try again."
-      exit $EXIT_PREREQ
-    fi
-    
-    log_info "Disk space check: ${available_mb}MB available (${min_space_mb}MB required) ✓"
-  else
-    log_warn "Cannot check disk space (df command not available)"
-  fi
-}
-
-# Function: check_zip_validity  
-# Description: Validates that the ZIP file is not corrupted
-# Parameter: $1 - path to ZIP file
-# Returns: 0 if valid, exits with EXIT_PREREQ if invalid
-check_zip_validity() {
-  local zip_file="$1"
-  
-  if [ ! -f "$zip_file" ]; then
-    log_err "Modpack file not found: $zip_file"
-    log_err "Please check the file path and try again."
-    exit $EXIT_PREREQ
-  fi
-  
-  log_info "Validating ZIP file integrity..."
-  
-  if command -v unzip >/dev/null 2>&1; then
-    if ! unzip -tq "$zip_file" >/dev/null 2>&1; then
-      log_err "ZIP file appears to be corrupted: $zip_file"
-      log_err "Please re-download the modpack and try again."
-      exit $EXIT_PREREQ
-    fi
-    log_info "ZIP file validation: OK ✓"
-  else
-    log_warn "Cannot validate ZIP file (unzip command not available)"
-  fi
-}
-
-# Function: check_port_availability
-# Description: Checks if port 25565 is already in use
-# Returns: 0 if available, warns if occupied
-check_port_availability() {
-  local port=25565
-  
-  if command -v ss >/dev/null 2>&1; then
-    if ss -ltn 2>/dev/null | grep -q ":${port}\s"; then
-      log_warn "Port $port appears to be in use by another process"
-      log_warn "The server may fail to start or you may need to change the port in server.properties"
-    else
-      log_info "Port $port availability: OK ✓"
-    fi
-  elif command -v netstat >/dev/null 2>&1; then
-    if netstat -ln 2>/dev/null | grep -q ":${port}\s"; then
-      log_warn "Port $port appears to be in use by another process"
-      log_warn "The server may fail to start or you may need to change the port in server.properties"
-    else
-      log_info "Port $port availability: OK ✓"
-    fi
-  else
-    log_warn "Cannot check port availability (ss/netstat not available)"
-  fi
-}
-
-# Function: check_existing_server
-# Description: Checks for existing Minecraft server processes
-# Returns: 0 always, but warns if server processes found
-check_existing_server() {
-  if command -v pgrep >/dev/null 2>&1; then
-    if pgrep -f "minecraft.*server|forge.*server|fabric.*server" >/dev/null 2>&1; then
-      log_warn "Existing Minecraft server process detected"
-      log_warn "You may want to stop it before installing a new server"
-    else
-      log_info "Server process check: No conflicting processes ✓"
-    fi
-  elif command -v ps >/dev/null 2>&1; then
-    if ps aux 2>/dev/null | grep -v grep | grep -q "minecraft.*server\|forge.*server\|fabric.*server"; then
-      log_warn "Existing Minecraft server process detected"
-      log_warn "You may want to stop it before installing a new server"
-    else
-      log_info "Server process check: No conflicting processes ✓"
-    fi
-  else
-    log_warn "Cannot check for existing server processes (pgrep/ps not available)"
-  fi
-}
-
-# Function: run_pre_flight_checks
-# Description: Runs all pre-flight checks
-# Parameter: $1 - ZIP file path
-run_pre_flight_checks() {
-  local zip_file="$1"
-  
-  log_info "Running pre-flight checks..."
-  
-  check_disk_space
-  check_zip_validity "$zip_file"
-  check_port_availability
-  check_existing_server
-  
-  log_info "Pre-flight checks completed ✓"
-}
+# All validation functions are now provided by lib/validation.sh
 
 # -----------------------------------------------------------------------------
 # Runtime flags (populated via CLI/env)
@@ -302,79 +177,25 @@ GUI=1  # Enable GUI by default
 NO_GUI=0
 
 # -----------------------------------------------------------------------------
-# Logging helpers
+# LOGGING & COMMAND LINE PROCESSING (Now handled by modules)
 # -----------------------------------------------------------------------------
-log()       { printf '%s\n' "$*"; }
-log_info()  { printf '[INFO] %s\n' "$*"; }
-log_warn()  { printf '[WARN] %s\n' "$*" >&2; }
-log_err()   { printf '[ERROR] %s\n' "$*" >&2; }
-LOG_LEVEL="info"   # info, warn, error
-LOG_VERBOSE=1      # 0=quiet, 1=normal, 2=verbose
-LOG_FILE=""
-LOG_TTY=1
-
-# Detect TTY for color
-if [ ! -t 1 ]; then LOG_TTY=0; fi
-
-# Color codes
-CLR_RESET="\033[0m"
-CLR_INFO="\033[32m"   # green
-CLR_WARN="\033[33m"   # yellow
-CLR_ERR="\033[31m"    # red
-
-# Timestamp
-timestamp() { date '+%Y-%m-%d %H:%M:%S'; }
-
-# Logging core
-log_msg() {
-  local level="$1" msg="$2" color="" prefix="" out="";
-  case "$level" in
-    info)  color="$CLR_INFO"; prefix="INFO";;
-    warn)  color="$CLR_WARN"; prefix="WARN";;
-    error) color="$CLR_ERR"; prefix="ERROR";;
-    *)     color="$CLR_RESET"; prefix="LOG";;
-  esac
-  out="[$(timestamp)] $prefix: $msg"
-  # Console output
-  if [ "$LOG_TTY" = "1" ]; then
-    printf "%b%s%b\n" "$color" "$out" "$CLR_RESET"
-  else
-    printf "%s\n" "$out"
-  fi
-  # Log file output
-  if [ -n "$LOG_FILE" ]; then
-    printf "%s\n" "$out" >> "$LOG_FILE"
-  fi
-}
-
-# Redefine logging functions to use the structured logger
-log()      { log_msg info "$*"; }
-log_info() { [ "$LOG_VERBOSE" -ge 1 ] && log_msg info "$*"; }
-log_warn() { [ "$LOG_VERBOSE" -ge 0 ] && log_msg warn "$*"; }
-log_err()  { log_msg error "$*"; }
-
-# Set up log file (logs/install-YYYYmmdd-HHMMSS.log)
-setup_log_file() {
-  local logdir="logs"
-  mkdir -p "$logdir"
-  local ts
-  ts="$(date '+%Y%m%d-%H%M%S')"
-  LOG_FILE="$logdir/install-$ts.log"
-}
-
-# Parse verbosity/log flags
+# All logging functionality is now provided by lib/logging.sh
+# Parse verbosity/log flags and setup logging
 for arg in "$@"; do
   case "$arg" in
-    --verbose) LOG_VERBOSE=2 ;;
-    --quiet)   LOG_VERBOSE=0 ;;
+    --verbose) set_log_verbose 2 ;;
+    --quiet)   quiet_logging ;;
     --log-file)
-      shift; LOG_FILE="$1" ;;
+      shift; setup_log_file "$1" ;;
     --log-file=*)
-      LOG_FILE="${arg#--log-file=}" ;;
+      setup_log_file "${arg#--log-file=}" ;;
   esac
 done
 
-setup_log_file
+# Setup log file if not already configured
+if [[ -z "$LOG_FILE" ]]; then
+  setup_log_file
+fi
 
 # -----------------------------------------------------------------------------
 # Utility helpers
