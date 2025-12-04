@@ -1,3 +1,4 @@
+#UNTESTED
 # MinecraftServerInstall
 
 This repository contains a comprehensive universal Bash script for installing and configuring modded Minecraft servers on Linux.
